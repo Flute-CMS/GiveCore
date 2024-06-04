@@ -11,15 +11,15 @@ use Nette\Utils\Json;
 
 class VipDriver extends AbstractDriver
 {
-
     public function deliver(User $user, Server $server, array $additional = [], ?int $timeId = null): bool
     {
-        [$dbConnection, $sid] = $this->validateAdditionalParams($additional, $server);
-
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
-        if (!$steam) {
+
+        if (!$steam->value) {
             throw new UserSocialException("Steam");
         }
+
+        [$dbConnection, $sid] = $this->validateAdditionalParams($additional, $server);
 
         $accountId = steam()->steamid($steam->value)->GetAccountID();
         $group = $additional['group'];
@@ -56,7 +56,7 @@ class VipDriver extends AbstractDriver
     {
         return 'vip';
     }
-    
+
     private function validateAdditionalParams(array $additional, Server $server): array
     {
         if (empty($additional['group'])) {
@@ -81,7 +81,10 @@ class VipDriver extends AbstractDriver
         $expiresTime = ($time === 0) ? 0 : ($currentGroup ? $currentGroup['expires'] + $time : time() + $time);
         if ($currentGroup) {
             $db->table('users')
-                ->update(['expires' => $expiresTime])
+                ->update([
+                    'expires' => $expiresTime,
+                    'group' => $group
+                ])
                 ->where('account_id', $accountId)
                 ->andWhere('sid', $sid)
                 ->run();
