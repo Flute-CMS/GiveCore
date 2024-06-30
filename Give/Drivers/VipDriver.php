@@ -5,6 +5,7 @@ namespace Flute\Modules\GiveCore\Give\Drivers;
 use Flute\Core\Database\Entities\Server;
 use Flute\Core\Database\Entities\User;
 use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
+use Flute\Modules\GiveCore\Exceptions\GiveDriverException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
 use Nette\Utils\Json;
