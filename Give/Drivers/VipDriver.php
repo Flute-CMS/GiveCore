@@ -57,16 +57,17 @@ class VipDriver extends AbstractDriver
         return true;
     }
 
-    private function updateVips(Server $server) 
+    private function updateVips(Server $server)
     {
         $query = new SourceQuery();
-        
+
         try {
             $query->Connect($server->ip, $server->port, 3, ($server->mod == 10) ? SourceQuery::GOLDSOURCE : SourceQuery::SOURCE);
             $query->SetRconPassword($server->rcon);
             $this->sendCommand($query, "vip_reload");
         } catch (\Exception $e) {
-            throw new GiveDriverException($e->getMessage());
+            logs()->error($e);
+            // throw new GiveDriverException($e->getMessage());
         } finally {
             $query->Disconnect();
         }
@@ -103,7 +104,12 @@ class VipDriver extends AbstractDriver
 
     private function updateOrInsertUser($db, $accountId, $sid, $group, $time, $user, $currentGroup = null)
     {
-        $expiresTime = ($time === 0) ? 0 : ($currentGroup ? $currentGroup['expires'] + $time : time() + $time);
+        if ($currentGroup['group'] !== $group) {
+            $expiresTime = ($time === 0) ? 0 : time() + $time;
+        } else {
+            $expiresTime = ($time === 0) ? 0 : ($currentGroup ? $currentGroup['expires'] + $time : time() + $time);
+        }
+        
         if ($currentGroup) {
             $db->table('users')
                 ->update([

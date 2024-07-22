@@ -5,7 +5,6 @@ namespace Flute\Modules\GiveCore\Give;
 use Flute\Core\Database\Entities\Server;
 use Flute\Core\Database\Entities\User;
 use Flute\Modules\GiveCore\Contracts\DriverInterface;
-use Flute\Modules\GiveCore\Give\Drivers\AdminDriver;
 use Flute\Modules\GiveCore\Give\Drivers\iksAdminDriver;
 use Flute\Modules\GiveCore\Give\Drivers\RconDriver;
 use Flute\Modules\GiveCore\Give\Drivers\VipDriver;
@@ -14,7 +13,6 @@ class GiveFactory
 {
     protected array $drivers = [
         'vip' => VipDriver::class,
-        // 'admin' => AdminDriver::class,
         'iksAdmin' => iksAdminDriver::class,
         'rcon' => RconDriver::class
     ];

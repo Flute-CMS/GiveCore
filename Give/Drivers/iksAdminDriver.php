@@ -15,51 +15,113 @@ class iksAdminDriver extends AbstractDriver
 {
     public function deliver(User $user, Server $server, array $additional = [], ?int $timeId = null): bool
     {
-        $steamid64 = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
-
-        if (!$steamid64->value) {
-            throw new UserSocialException("Steam");
-        }
+        $steamid64 = $this->getSteamId($user);
 
         [$dbConnection, $sid] = $this->validateAdditionalParams($additional, $server);
 
         $group_id = $additional['group_id'];
-        $time = !$timeId ? ($additional['time'] ?? 0) : $timeId;
+        $time = $timeId ?? ($additional['time'] ?? 0);
 
         $db = dbal()->database($dbConnection->dbname);
-        $dbusers = $db->table("admins")->select()
-            ->where('sid', $steamid64->value)
-            ->andWhere('server_id', $sid)
-            ->fetchAll();
+        $dbusers = $this->getDbUsers($db, $steamid64->value, $sid);
 
         if (!empty($dbusers)) {
             $dbuser = $dbusers[0];
-
-            if ($dbuser['group_id'] === $group_id)
-                $this->confirm(__("givecore.add_time", [
-                    ':server' => $server->name
-                ]));
-            else
-                $this->confirm(__("givecore.replace_group", [
-                    ':group_id' => $dbuser['group_id'],
-                    ':newGroup' => $group_id
-                ]));
-
+            $this->confirmUserGroup($dbuser, $group_id, $server);
             $this->updateOrInsertUser($db, $steamid64->value, $sid, $group_id, $time, $user, $dbuser);
         } else {
             $this->updateOrInsertUser($db, $steamid64->value, $sid, $group_id, $time, $user);
         }
 
-        if ($server->rcon)
+        if ($server->rcon) {
             $this->updateAdmins($server);
+        }
 
         return true;
     }
 
-    private function updateAdmins(Server $server) 
+    private function getSteamId(User $user)
+    {
+        $steamid64 = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
+
+        if (!$steamid64 || !$steamid64->value) {
+            throw new UserSocialException("Steam");
+        }
+
+        return $steamid64;
+    }
+
+    private function getDbUsers($db, $steamid64, $sid)
+    {
+        return $db->table("admins")->select()
+            ->where('sid', $steamid64)
+            ->andWhere('server_id', $sid)
+            ->fetchAll();
+    }
+
+    private function confirmUserGroup($dbuser, $group_id, $server)
+    {
+        if ($dbuser['group_id'] === $group_id) {
+            $this->confirm(__("givecore.add_time", [':server' => $server->name]));
+        } else {
+            $this->confirm(__("givecore.replace_group", [
+                ':group_id' => $dbuser['group_id'],
+                ':newGroup' => $group_id
+            ]));
+        }
+    }
+
+    private function updateOrInsertUser($db, $steamid64, $sid, $group_id, $time, $user, $currentGroup = null): void
+    {
+        $currentUnixTime = time();
+        $expiresTime = $this->calculateExpiresTime($time, $currentUnixTime, $currentGroup, $group_id);
+
+        if ($currentGroup) {
+            $this->updateUser($db, $steamid64, $sid, $group_id, $expiresTime);
+        } else {
+            $this->insertUser($db, $steamid64, $sid, $group_id, $expiresTime, $user);
+        }
+    }
+
+    private function calculateExpiresTime($time, $currentUnixTime, $currentGroup, $group_id): int
+    {
+        if ($currentGroup['group_id'] === $group_id) {
+            return ($time === 0) ? 0 : ($currentGroup ? $currentGroup['end'] + $time : $currentUnixTime + $time);
+        }
+        return ($time === 0) ? 0 : $currentUnixTime + $time;
+    }
+
+    private function updateUser($db, $steamid64, $sid, $group_id, $expiresTime): void
+    {
+        $db->table('admins')
+            ->update([
+                'end' => $expiresTime,
+                'group_id' => $group_id
+            ])
+            ->where('sid', $steamid64)
+            ->andWhere('server_id', $sid)
+            ->run();
+    }
+
+    private function insertUser($db, $steamid64, $sid, $group_id, $expiresTime, $user): void
+    {
+        $db->insert('admins')
+            ->values([
+                'end' => $expiresTime,
+                'group_id' => $group_id,
+                'sid' => $steamid64,
+                'flags' => "",
+                'immunity' => -1,
+                'server_id' => $sid,
+                'name' => $user->name,
+            ])
+            ->run();
+    }
+
+    private function updateAdmins(Server $server): void
     {
         $query = new SourceQuery();
-        
+
         try {
             $query->Connect($server->ip, $server->port, 3, ($server->mod == 10) ? SourceQuery::GOLDSOURCE : SourceQuery::SOURCE);
             $query->SetRconPassword($server->rcon);
@@ -98,35 +160,5 @@ class iksAdminDriver extends AbstractDriver
         }
 
         return [$dbConnection, $dbParams->sid];
-    }
-
-    private function updateOrInsertUser($db, $steamid64, $sid, $group_id, $time, $user, $currentGroup = null)
-    {
-        $currentUnixTime = time();
-
-        $expiresTime = ($time === 0) ? 0 : ($currentGroup ? $currentGroup['end'] + $time : $currentUnixTime + $time);
-
-        if ($currentGroup) {
-            $db->table('admins')
-                ->update([
-                    'end' => $expiresTime,
-                    'group_id' => $group_id
-                ])
-                ->where('sid', $steamid64)
-                ->andWhere('server_id', $sid)
-                ->run();
-        } else {
-            $db->insert('admins')
-                ->values([
-                    'end' => $expiresTime,
-                    'group_id' => $group_id,
-                    'sid' => $steamid64,
-                    'flags' => "",
-                    'immunity' => -1,
-                    'server_id' => $sid,
-                    'name' => $user->name,
-                ])
-                ->run();
-        }
     }
 }

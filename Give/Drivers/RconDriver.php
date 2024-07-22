@@ -14,45 +14,22 @@ class RconDriver implements DriverInterface
 {
     public function deliver(User $user, Server $server, array $additional = [], ?int $timeId = null): bool
     {
-        if (!$server->rcon)
-            throw new BadConfigurationException("Server $server->name rcon empty");
-
-        if (!isset($additional['command']))
-            throw new BadConfigurationException('command');
+        $this->validateServerAndCommand($server, $additional);
 
         $commands = explode(';', $additional['command']);
-        $steam = false;
-
-        if (preg_match('/{{steam32}}|{{steam64}}|{{accountId}}/i', $additional['command'])) {
-            $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
-
-            if (!$steam)
-                throw new UserSocialException("Steam");
-
-            $steam = $steam->value;
-        }
+        $steam = $this->getSteamId($user, $additional['command']);
 
         $query = new SourceQuery();
 
         try {
-            $query->Connect($server->ip, $server->port, 3, ($server->mod == 10) ? SourceQuery::GOLDSOURCE : SourceQuery::SOURCE);
-            $query->SetRconPassword($server->rcon);
-
-            foreach ($commands as $command) {
-                $command = trim($command);
-                if (empty($command)) {
-                    continue;
-                }
-                $this->sendCommand($query, $this->replace($command, $steam, $user));
-            }
+            $this->connectToServer($query, $server);
+            $this->executeCommands($query, $commands, $steam, $user);
             return true;
         } catch (\Exception $e) {
             throw new GiveDriverException($e->getMessage());
         } finally {
             $query->Disconnect();
         }
-
-        return false;
     }
 
     public function alias(): string
@@ -60,39 +37,80 @@ class RconDriver implements DriverInterface
         return 'rcon';
     }
 
-    protected function replace(string $command, $steam, User $user): string
+    private function validateServerAndCommand(Server $server, array $additional): void
     {
-        $steam32 = '';
-        $steam64 = '';
-        $accountId = '';
-
-        if ($steam) {
-            $steamClass = steam()->steamid($steam);
-            $steam32 = $steamClass->RenderSteam2();
-            $steam64 = $steamClass->ConvertToUInt64();
-            $accountId = $steamClass->GetAccountID();
+        if (!$server->rcon) {
+            throw new BadConfigurationException("Server $server->name rcon empty");
         }
 
-        return str_replace([
-            '{{steam32}}',
-            '{{steam64}}',
-            '{{accountId}}',
-            '{{login}}',
-            '{{name}}',
-            '{{email}}',
-            '{{uri}}'
-        ], [
-            $steam32,
-            $steam64,
-            $accountId,
-            $user->login,
-            $user->name,
-            $user->email,
-            $user->uri
-        ], $command);
+        if (!isset($additional['command'])) {
+            throw new BadConfigurationException('command');
+        }
     }
 
-    protected function sendCommand(SourceQuery $query, string $command): void
+    private function getSteamId(User $user, string $command): ?string
+    {
+        if (preg_match('/{{steam32}}|{{steam64}}|{{accountId}}/i', $command)) {
+            $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
+
+            if (!$steam) {
+                throw new UserSocialException("Steam");
+            }
+
+            return $steam->value;
+        }
+
+        return null;
+    }
+
+    private function connectToServer(SourceQuery $query, Server $server): void
+    {
+        $query->Connect(
+            $server->ip,
+            $server->port,
+            3,
+            ($server->mod == 10) ? SourceQuery::GOLDSOURCE : SourceQuery::SOURCE
+        );
+        $query->SetRconPassword($server->rcon);
+    }
+
+    private function executeCommands(SourceQuery $query, array $commands, ?string $steam, User $user): void
+    {
+        foreach ($commands as $command) {
+            $command = trim($command);
+            if (empty($command)) {
+                continue;
+            }
+            $this->sendCommand($query, $this->replacePlaceholders($command, $steam, $user));
+        }
+    }
+
+    private function replacePlaceholders(string $command, ?string $steam, User $user): string
+    {
+        $steamDetails = $this->getSteamDetails($steam);
+
+        return str_replace(
+            ['{{steam32}}', '{{steam64}}', '{{accountId}}', '{{login}}', '{{name}}', '{{email}}', '{{uri}}'],
+            [$steamDetails['steam32'], $steamDetails['steam64'], $steamDetails['accountId'], $user->login, $user->name, $user->email, $user->uri],
+            $command
+        );
+    }
+
+    private function getSteamDetails(?string $steam): array
+    {
+        if ($steam) {
+            $steamClass = steam()->steamid($steam);
+            return [
+                'steam32' => $steamClass->RenderSteam2(),
+                'steam64' => $steamClass->ConvertToUInt64(),
+                'accountId' => $steamClass->GetAccountID()
+            ];
+        }
+
+        return ['steam32' => '', 'steam64' => '', 'accountId' => ''];
+    }
+
+    private function sendCommand(SourceQuery $query, string $command): void
     {
         $query->Rcon($command);
     }
