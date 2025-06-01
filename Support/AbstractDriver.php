@@ -49,4 +49,15 @@ abstract class AbstractDriver implements DriverInterface
 
         return $validate;
     }
+
+    public function getPrefix(string $dbname, string $defaultPrefix = '') : string
+    {
+        $db = config('database.databases.'.$dbname)['prefix'];
+
+        if(empty($db)) {
+            return $defaultPrefix;
+        }
+
+        return "";
+    }
 }

@@ -1,7 +1,7 @@
 {
     "name": "GiveCore",
-    "version": "1.0.7",
-    "description": "A core module for what provides a ability to to give privileges",
+    "version": "1.0.4",
+    "description": "Module for giving privileges to users",
     "authors": [
         "Flames"
     ],
