@@ -1,0 +1,12 @@
+{
+    "name": "GiveCore",
+    "version": "1.0.9",
+    "description": "Module for giving privileges to users",
+    "authors": [
+        "Flames"
+    ],
+    "providers": [
+        "Flute\\Modules\\GiveCore\\ServiceProviders\\GiveCoreServiceProvider"
+    ],
+    "dependencies": {}
+}
