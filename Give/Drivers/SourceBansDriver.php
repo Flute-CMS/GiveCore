@@ -2,38 +2,189 @@
 
 namespace Flute\Modules\GiveCore\Give\Drivers;
 
+use Exception;
 use Flute\Core\Database\Entities\Server;
 use Flute\Core\Database\Entities\User;
+use Flute\Modules\GiveCore\Contracts\CheckableInterface;
 use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
+use Flute\Modules\GiveCore\Support\CheckableTrait;
 use xPaw\SteamID\SteamID;
 
-/**
- * Params:
- *
- * group - group name
- * immunity - admin immunity level
- * password - optional admin password (will be generated if not provided)
- */
-class SourceBansDriver extends AbstractDriver
+use function mt_rand;
+
+class SourceBansDriver extends AbstractDriver implements CheckableInterface
 {
+    use CheckableTrait;
+
+    protected const MOD_KEY = 'SourceBans';
+
     protected string $prefix = '';
 
-    /**
-     * Deliver admin privileges to a user
-     */
-    public function deliver(User $user, Server $server, array $additional = [], ?int $timeId = null, bool $ignoreErrors = false): bool
+    // ── Metadata ───────────────────────────────────────────────────
+
+    public function alias(): string
     {
+        return 'sourcebans';
+    }
+
+    public function name(): string
+    {
+        return __('givecore.drivers.sourcebans.name');
+    }
+
+    public function description(): string
+    {
+        return __('givecore.drivers.sourcebans.description');
+    }
+
+    public function icon(): string
+    {
+        return 'ph.bold.shield-star-bold';
+    }
+
+    public function category(): string
+    {
+        return 'admin';
+    }
+
+    public function deliverFields(): array
+    {
+        return [
+            'group' => [
+                'type' => 'text',
+                'label' => __('givecore.fields.admin_group'),
+                'required' => false,
+                'placeholder' => __('givecore.fields.group_optional_placeholder'),
+                'help' => __('givecore.fields.sb_group_help'),
+            ],
+            'flags' => [
+                'type' => 'text',
+                'label' => __('givecore.fields.flags'),
+                'required' => false,
+                'placeholder' => __('givecore.fields.flags_placeholder'),
+                'help' => __('givecore.fields.sb_flags_help'),
+            ],
+            'immunity' => [
+                'type' => 'number',
+                'label' => __('givecore.fields.immunity'),
+                'required' => false,
+                'min' => 0,
+                'max' => 100,
+            ],
+            'password' => [
+                'type' => 'text',
+                'label' => __('givecore.fields.password'),
+                'required' => false,
+                'placeholder' => __('givecore.fields.password_placeholder'),
+            ],
+        ];
+    }
+
+    public function checkFields(): array
+    {
+        return [
+            'server_id' => [
+                'type' => 'select',
+                'label' => __('givecore.fields.server'),
+                'required' => false,
+                'options' => $this->getServerOptions(static::MOD_KEY),
+            ],
+            'min_immunity' => [
+                'type' => 'number',
+                'label' => __('givecore.fields.min_immunity'),
+                'required' => false,
+                'min' => 0,
+                'max' => 100,
+                'default' => 0,
+            ],
+            'flags' => [
+                'type' => 'text',
+                'label' => __('givecore.fields.required_flags'),
+                'required' => false,
+                'placeholder' => __('givecore.fields.flags_placeholder'),
+            ],
+        ];
+    }
+
+    // ── Condition check ────────────────────────────────────────────
+
+    public function check(User $user, array $params = []): bool
+    {
+        $steamId = $this->getUserSteamId($user);
+        if (!$steamId) {
+            return false;
+        }
+
+        $authId = $this->convertSteamId($steamId);
+
+        $servers = !empty($params['server_id'])
+            ? [$this->getServerById((int) $params['server_id'])]
+            : $this->getServersWithConnection(static::MOD_KEY);
+
+        foreach ($servers as $server) {
+            if (!$server) {
+                continue;
+            }
+
+            $dbConnection = $server->getDbConnection('SourceBans');
+            if (!$dbConnection) {
+                continue;
+            }
+
+            $prefix = $this->getPrefix($dbConnection->dbname, 'sb_');
+            $db = dbal()->database($dbConnection->dbname);
+
+            $admin = $db
+                ->select()
+                ->from($prefix . 'admins')
+                ->where('authid', '=', $authId)
+                ->fetchAll();
+
+            if (empty($admin)) {
+                continue;
+            }
+
+            $record = $admin[0];
+
+            $minImmunity = (int) ( $params['min_immunity'] ?? 0 );
+            if ($minImmunity > 0 && (int) ( $record['immunity'] ?? 0 ) < $minImmunity) {
+                continue;
+            }
+
+            $requiredFlags = $params['flags'] ?? '';
+            if (!empty($requiredFlags)) {
+                $srvFlags = $record['srv_flags'] ?? '';
+                if (!$this->hasFlags($srvFlags, $requiredFlags)) {
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    // ── Delivery ───────────────────────────────────────────────────
+
+    public function deliver(
+        User $user,
+        Server $server,
+        array $additional = [],
+        ?int $timeId = null,
+        bool $ignoreErrors = false,
+    ): bool {
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
 
         if (!$steam->value) {
-            throw new UserSocialException("Steam");
+            throw new UserSocialException('Steam');
         }
 
         $simulate = false;
         if (array_key_exists('__simulate', $additional)) {
-            $simulate = (bool)$additional['__simulate'];
+            $simulate = (bool) $additional['__simulate'];
             unset($additional['__simulate']);
         }
 
@@ -44,28 +195,36 @@ class SourceBansDriver extends AbstractDriver
         $db = dbal()->database($dbConnection->dbname);
         $authId = $this->convertSteamId($steam->value);
         $groupName = $additional['group'] ?? '';
-        $immunity = (int) ($additional['immunity'] ?? 0);
+        $flags = $additional['flags'] ?? '';
+        $immunity = (int) ( $additional['immunity'] ?? 0 );
         $password = $additional['password'] ?? $this->generatePassword();
 
-        $existingAdmin = $db->select()
-            ->from($this->prefix.'admins')
+        $existingAdmin = $db
+            ->select()
+            ->from($this->prefix . 'admins')
             ->where('authid', '=', $authId)
             ->fetchAll();
 
         if (!empty($existingAdmin)) {
             $admin = $existingAdmin[0];
             if (!$ignoreErrors) {
-                $this->confirm(__("givecore.update_admin", [
+                $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['user'],
-                    ':group' => $groupName,
+                    ':group' => $groupName ?: $flags,
                 ]));
             }
 
             if (!$simulate) {
-                $db->update($this->prefix.'admins', [
-                    'srv_group' => $groupName,
-                    'immunity' => $immunity,
-                ])
+                $updateData = ['immunity' => $immunity];
+                if (!empty($groupName)) {
+                    $updateData['srv_group'] = $groupName;
+                }
+                if (!empty($flags)) {
+                    $updateData['srv_flags'] = $flags;
+                }
+
+                $db
+                    ->update($this->prefix . 'admins', $updateData)
                     ->where('aid', '=', $admin['aid'])
                     ->run();
             }
@@ -73,40 +232,46 @@ class SourceBansDriver extends AbstractDriver
             $adminId = $admin['aid'];
         } else {
             if (!$simulate) {
-                $db->insert($this->prefix.'admins')
-                    ->values([
-                        'user' => $user->name,
-                        'authid' => $authId,
-                        'password' => password_hash($password, PASSWORD_DEFAULT),
-                        'gid' => 0,
-                        'email' => $user->email ?? '',
-                        'srv_group' => $groupName,
-                        'immunity' => $immunity,
-                        'lastvisit' => time(),
-                    ])
+                $insertData = [
+                    'user' => $user->name,
+                    'authid' => $authId,
+                    'password' => password_hash($password, PASSWORD_DEFAULT),
+                    'gid' => 0,
+                    'email' => $user->email ?? '',
+                    'srv_group' => $groupName,
+                    'srv_flags' => $flags,
+                    'immunity' => $immunity,
+                    'lastvisit' => time(),
+                ];
+
+                $db
+                    ->insert($this->prefix . 'admins')
+                    ->values($insertData)
                     ->run();
 
-                $results = $db->select('aid')
-                    ->from($this->prefix.'admins')
+                $results = $db
+                    ->select('aid')
+                    ->from($this->prefix . 'admins')
                     ->where('authid', '=', $authId)
                     ->orderBy('aid', 'DESC')
                     ->fetchAll();
 
                 if (empty($results)) {
-                    throw new \Exception("Failed to get admin ID after creation");
+                    throw new Exception('Failed to get admin ID after creation');
                 }
 
                 $adminId = $results[0]['aid'];
             } else {
-                $adminId = 0; // dummy ID for simulation
+                $adminId = 0;
             }
         }
 
         $sourceBansServerId = 0;
 
         if (!empty($server->ip) && !empty($server->port)) {
-            $servers = $db->select('sid')
-                ->from($this->prefix.'servers')
+            $servers = $db
+                ->select('sid')
+                ->from($this->prefix . 'servers')
                 ->where('ip', '=', $server->ip)
                 ->andWhere('port', '=', $server->port)
                 ->fetchAll();
@@ -123,21 +288,31 @@ class SourceBansDriver extends AbstractDriver
         return !$simulate;
     }
 
-    /**
-     * Assign a server to a SourceBans admin
-     */
+    // ── Private helpers ────────────────────────────────────────────
+
+    protected function hasFlags(string $userFlags, string $requiredFlags): bool
+    {
+        for ($i = 0; $i < strlen($requiredFlags); $i++) {
+            if (strpos($userFlags, $requiredFlags[$i]) === false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     protected function assignServerToAdmin($db, $adminId, $serverId): void
     {
-        // Check if assignment already exists
-        $existingAssignment = $db->select()
-            ->from($this->prefix.'admins_servers_groups')
+        $existingAssignment = $db
+            ->select()
+            ->from($this->prefix . 'admins_servers_groups')
             ->where('admin_id', '=', $adminId)
             ->andWhere('server_id', '=', $serverId)
             ->fetchAll();
 
         if (empty($existingAssignment)) {
-            // Create new assignment
-            $db->insert($this->prefix.'admins_servers_groups')
+            $db
+                ->insert($this->prefix . 'admins_servers_groups')
                 ->values([
                     'admin_id' => $adminId,
                     'server_id' => $serverId,
@@ -148,58 +323,41 @@ class SourceBansDriver extends AbstractDriver
         }
     }
 
-    /**
-     * Generate a random password
-     */
     protected function generatePassword(int $length = 12): string
     {
         $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
         $password = '';
 
         for ($i = 0; $i < $length; $i++) {
-            $password .= $chars[\mt_rand(0, strlen($chars) - 1)];
+            $password .= $chars[mt_rand(0, strlen($chars) - 1)];
         }
 
         return $password;
     }
 
-    /**
-     * Convert Steam ID to SourceBans format
-     */
     protected function convertSteamId(string $steamId): string
     {
         try {
             $steamID = new SteamID($steamId);
 
             return $steamID->RenderSteam2();
-        } catch (\Exception $e) {
-            logs()->error('Failed to convert Steam ID: '.$e->getMessage());
+        } catch (Exception $e) {
+            logs()->error('Failed to convert Steam ID: ' . $e->getMessage());
 
             return $steamId;
         }
     }
 
-    /**
-     * Return the driver alias
-     */
-    public function alias(): string
-    {
-        return 'sourcebans';
-    }
-
-    /**
-     * Validate the additional parameters
-     */
     protected function validateAdditionalParams(array $additional, Server $server): array
     {
-        if (empty($additional['group'])) {
-            throw new BadConfigurationException('group in configuration is required');
+        if (empty($additional['group']) && empty($additional['flags'])) {
+            throw new BadConfigurationException('group or flags is required');
         }
 
         $dbConnection = $server->getDbConnection('SourceBans');
 
         if (!$dbConnection) {
-            throw new BadConfigurationException("db connection SourceBans is not exists");
+            throw new BadConfigurationException('db connection SourceBans is not exists');
         }
 
         return [$dbConnection, 0];

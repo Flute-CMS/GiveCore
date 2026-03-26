@@ -8,4 +8,4 @@
                 placeholder="{{ __('givecore.settings.sid_placeholder') }}" required />
         </x-admin::forms.field>
     </div>
-</div> 
+</div>

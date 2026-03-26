@@ -1,12 +1,15 @@
 {
     "name": "GiveCore",
-    "version": "1.0.9",
-    "description": "Module for giving privileges to users",
+    "version": "2.0.0",
+    "description": "Central hub for game server integrations: privilege delivery and condition checking",
     "authors": [
         "Flames"
     ],
     "providers": [
         "Flute\\Modules\\GiveCore\\ServiceProviders\\GiveCoreServiceProvider"
     ],
-    "dependencies": {}
+    "dependencies": {
+        "flute": ">=1.0.0"
+    },
+    "installerClass": "Flute\\Modules\\GiveCore\\Installer"
 }

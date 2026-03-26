@@ -6,8 +6,19 @@ use Flute\Modules\GiveCore\Contracts\DriverInterface;
 use Flute\Modules\GiveCore\Exceptions\NeedToConfirmException;
 use Flute\Modules\GiveCore\Exceptions\NeedToSelectException;
 
+/**
+ * Base class for GiveCore delivery drivers.
+ * Subclasses MUST implement deliver() and alias().
+ */
 abstract class AbstractDriver implements DriverInterface
 {
+    use DriverHelpers;
+
+    /**
+     * DB connection key (override in subclass).
+     */
+    protected const MOD_KEY = null;
+
     public function confirm(string $message, ?string $id = null)
     {
         $id ??= sha1($message);
@@ -54,26 +65,61 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Return prefix that should be prepended to table names **only** if the
-     * connection itself does not already define one.
-     *
-     * 1. First we try to read it from database.databases.<dbname>.prefix – this is
-     *    where our dynamic connections are usually stored.
-     * 2. Fallback to database.connections.<dbname>.prefix – some parts of the
-     *    code (e.g. during install) may register connections there.
-     *
-     * If a non-empty prefix is found in either place we must NOT add the
-     * defaultPrefix to avoid duplicated names like "vip_vip_users". Otherwise we
-     * apply the provided default prefix (e.g. "vip_", "sb_" …).
+     * Alias for getDbPrefix from trait (backward compatibility with old drivers).
      */
     public function getPrefix(string $dbname, string $defaultPrefix = ''): string
     {
-        $prefix = config("database.databases.$dbname.prefix");
+        return $this->getDbPrefix($dbname, $defaultPrefix);
+    }
 
-        if ($prefix === null) {
-            $prefix = config("database.connections.$dbname.prefix");
+    // ── Metadata defaults ──────────────────────────────────────────
+
+    public function name(): string
+    {
+        return $this->alias();
+    }
+
+    public function description(): string
+    {
+        return '';
+    }
+
+    public function icon(): string
+    {
+        return 'ph.bold.plug-bold';
+    }
+
+    public function category(): string
+    {
+        return 'other';
+    }
+
+    public function deliverFields(): array
+    {
+        return [];
+    }
+
+    public function dbConnectionKey(): ?string
+    {
+        return static::MOD_KEY;
+    }
+
+    public function isAvailable(): bool
+    {
+        $key = $this->dbConnectionKey();
+        if ($key === null) {
+            return true;
         }
 
-        return empty($prefix) ? $defaultPrefix : '';
+        return !empty($this->getServersWithConnection($key));
+    }
+
+    public function unavailableReason(): ?string
+    {
+        if ($this->isAvailable()) {
+            return null;
+        }
+
+        return __('givecore.no_servers', ['key' => $this->dbConnectionKey() ?? '']);
     }
 }

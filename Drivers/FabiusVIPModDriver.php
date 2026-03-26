@@ -11,7 +11,7 @@ class FabiusVIPModDriver implements ModDriverInterface
      */
     public function getName(): string
     {
-        return "FabiusVIP";
+        return 'FabiusVIP';
     }
 
     /**

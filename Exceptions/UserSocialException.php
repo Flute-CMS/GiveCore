@@ -2,6 +2,8 @@
 
 namespace Flute\Modules\GiveCore\Exceptions;
 
-class UserSocialException extends \Exception
+use Exception;
+
+class UserSocialException extends Exception
 {
 }

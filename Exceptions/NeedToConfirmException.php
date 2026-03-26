@@ -2,7 +2,9 @@
 
 namespace Flute\Modules\GiveCore\Exceptions;
 
-class NeedToConfirmException extends \Exception
+use Exception;
+
+class NeedToConfirmException extends Exception
 {
     protected array $values = [];
 

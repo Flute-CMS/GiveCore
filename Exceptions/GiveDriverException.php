@@ -2,6 +2,8 @@
 
 namespace Flute\Modules\GiveCore\Exceptions;
 
-class GiveDriverException extends \Exception
+use Exception;
+
+class GiveDriverException extends Exception
 {
 }

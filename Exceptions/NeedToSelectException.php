@@ -2,7 +2,9 @@
 
 namespace Flute\Modules\GiveCore\Exceptions;
 
-class NeedToSelectException extends \Exception
+use Exception;
+
+class NeedToSelectException extends Exception
 {
     protected array $values = [];
 

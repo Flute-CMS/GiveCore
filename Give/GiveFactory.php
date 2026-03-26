@@ -2,13 +2,20 @@
 
 namespace Flute\Modules\GiveCore\Give;
 
+use Exception;
 use Flute\Core\Database\Entities\Server;
 use Flute\Core\Database\Entities\User;
+use Flute\Modules\GiveCore\Contracts\CheckableInterface;
 use Flute\Modules\GiveCore\Contracts\DriverInterface;
 use Flute\Modules\GiveCore\Give\Drivers\AdminSystemDriver;
+use Flute\Modules\GiveCore\Give\Drivers\AmxModDriver;
 use Flute\Modules\GiveCore\Give\Drivers\FabiusDriver;
+use Flute\Modules\GiveCore\Give\Drivers\K4SystemDriver;
+use Flute\Modules\GiveCore\Give\Drivers\LiteBansDriver;
+use Flute\Modules\GiveCore\Give\Drivers\LuckPermsDriver;
+use Flute\Modules\GiveCore\Give\Drivers\PexDriver;
 use Flute\Modules\GiveCore\Give\Drivers\RconDriver;
-use Flute\Modules\GiveCore\Give\Drivers\SourcebansDriver;
+use Flute\Modules\GiveCore\Give\Drivers\SourceBansDriver;
 use Flute\Modules\GiveCore\Give\Drivers\VipDriver;
 
 class GiveFactory
@@ -18,36 +25,65 @@ class GiveFactory
         'fabius' => FabiusDriver::class,
         'rcon' => RconDriver::class,
         'adminsystem' => AdminSystemDriver::class,
-        'sourcebans' => SourcebansDriver::class,
+        'sourcebans' => SourceBansDriver::class,
+        'luckperms' => LuckPermsDriver::class,
+        'pex' => PexDriver::class,
+        'amxmod' => AmxModDriver::class,
+        'k4system' => K4SystemDriver::class,
+        'litebans' => LiteBansDriver::class,
     ];
 
+    /**
+     * @var array<string, DriverInterface>
+     */
+    protected array $instances = [];
+
+    /**
+     * Get all registered driver classes.
+     */
     public function getAll(): array
     {
         return $this->drivers;
     }
 
-    public function make(string $name, User $user, Server $server, array $additional = [], ?int $timeId = null, bool $ignoreErrors = false): bool
-    {
+    /**
+     * Execute delivery via a named driver.
+     */
+    public function make(
+        string $name,
+        User $user,
+        Server $server,
+        array $additional = [],
+        ?int $timeId = null,
+        bool $ignoreErrors = false,
+    ): bool {
         if (!$this->exists($name)) {
-            throw new \Exception("Driver '$name' is not exists");
+            throw new Exception("Driver '{$name}' is not exists");
         }
 
-        return (new $this->drivers[$name]())->deliver($user, $server, $additional, $timeId, $ignoreErrors);
+        return ( new $this->drivers[$name]() )->deliver($user, $server, $additional, $timeId, $ignoreErrors);
     }
 
+    /**
+     * Register a new delivery driver.
+     */
     public function add(string $class): self
     {
-        /** @var DriverInterface */
+        /** @var DriverInterface $instance */
         $instance = new $class();
 
         $this->drivers[$instance->alias()] = $class;
+        unset($this->instances[$instance->alias()]);
 
         return $this;
     }
 
-    public function remove(string $class): self
+    /**
+     * Remove a driver by alias.
+     */
+    public function remove(string $alias): self
     {
-        unset($this->drivers[$class]);
+        unset($this->drivers[$alias], $this->instances[$alias]);
 
         return $this;
     }
@@ -55,5 +91,67 @@ class GiveFactory
     public function exists(string $name): bool
     {
         return array_key_exists($name, $this->drivers);
+    }
+
+    /**
+     * Get a cached driver instance by alias.
+     */
+    public function getDriver(string $name): ?DriverInterface
+    {
+        if (!$this->exists($name)) {
+            return null;
+        }
+
+        if (!isset($this->instances[$name])) {
+            $this->instances[$name] = new $this->drivers[$name]();
+        }
+
+        return $this->instances[$name];
+    }
+
+    /**
+     * Get metadata for all registered drivers.
+     *
+     * @return array<string, array{alias: string, name: string, description: string, icon: string, category: string, isAvailable: bool, unavailableReason: ?string, canCheck: bool}>
+     */
+    public function getDriversMeta(): array
+    {
+        $meta = [];
+
+        foreach ($this->drivers as $alias => $class) {
+            $driver = $this->getDriver($alias);
+
+            $meta[$alias] = [
+                'alias' => $alias,
+                'name' => $driver->name(),
+                'description' => $driver->description(),
+                'icon' => $driver->icon(),
+                'category' => $driver->category(),
+                'isAvailable' => $driver->isAvailable(),
+                'unavailableReason' => $driver->unavailableReason(),
+                'canCheck' => $driver instanceof CheckableInterface,
+            ];
+        }
+
+        return $meta;
+    }
+
+    /**
+     * Get delivery drivers that also support condition checking.
+     *
+     * @return array<string, DriverInterface&CheckableInterface>
+     */
+    public function getCheckableDrivers(): array
+    {
+        $result = [];
+
+        foreach ($this->drivers as $alias => $class) {
+            $driver = $this->getDriver($alias);
+            if ($driver instanceof CheckableInterface) {
+                $result[$alias] = $driver;
+            }
+        }
+
+        return $result;
     }
 }

@@ -11,7 +11,7 @@ class VIPModDriver implements ModDriverInterface
      */
     public function getName(): string
     {
-        return "VIP";
+        return 'VIP';
     }
 
     /**

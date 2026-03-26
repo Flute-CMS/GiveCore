@@ -2,31 +2,71 @@
 
 namespace Flute\Modules\GiveCore\Give\Drivers;
 
+use Exception;
 use Flute\Core\Database\Entities\Server;
 use Flute\Core\Database\Entities\User;
+use Flute\Core\Rcon\RconService;
 use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
 use Flute\Modules\GiveCore\Exceptions\GiveDriverException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
-use xPaw\SourceQuery\SourceQuery;
-
-/**
- * Params:
- *
- * command - command to execute
- *
- * time - time in seconds
- */
 
 class RconDriver extends AbstractDriver
 {
     protected $time;
 
-    public function deliver(User $user, Server $server, array $additional = [], ?int $timeId = null, bool $ignoreErrors = false): bool
+    // ── Metadata ───────────────────────────────────────────────────
+
+    public function alias(): string
     {
+        return 'rcon';
+    }
+
+    public function name(): string
+    {
+        return __('givecore.drivers.rcon.name');
+    }
+
+    public function description(): string
+    {
+        return __('givecore.drivers.rcon.description');
+    }
+
+    public function icon(): string
+    {
+        return 'ph.bold.terminal-bold';
+    }
+
+    public function category(): string
+    {
+        return 'rcon';
+    }
+
+    public function deliverFields(): array
+    {
+        return [
+            'command' => [
+                'type' => 'textarea',
+                'label' => __('givecore.fields.command'),
+                'required' => true,
+                'placeholder' => __('givecore.fields.command_placeholder'),
+                'help' => __('givecore.fields.command_help'),
+            ],
+        ];
+    }
+
+    // ── Delivery ───────────────────────────────────────────────────
+
+    public function deliver(
+        User $user,
+        Server $server,
+        array $additional = [],
+        ?int $timeId = null,
+        bool $ignoreErrors = false,
+    ): bool {
         $simulate = false;
         if (array_key_exists('__simulate', $additional)) {
-            $simulate = (bool)$additional['__simulate'];
+            $simulate = (bool) $additional['__simulate'];
             unset($additional['__simulate']);
         }
 
@@ -50,39 +90,32 @@ class RconDriver extends AbstractDriver
             }
         }
 
-        $steam = $this->getSteamId($user, $additional['command']);
+        $steam = $this->getSteamIdForCommand($user, $additional['command']);
 
         if ($timeId !== null) {
             $this->time = $timeId;
         }
 
-        $query = new SourceQuery();
-
         if ($simulate) {
-            return false; // simulation mode - no actual commands executed
+            return false;
         }
 
         try {
-            $this->connectToServer($query, $server);
-            $this->executeCommands($query, $commands, $steam, $user, $additional);
+            $rconService = app(RconService::class);
+            $this->executeCommands($rconService, $server, $commands, $steam, $user, $additional);
 
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new GiveDriverException($e->getMessage());
-        } finally {
-            $query->Disconnect();
         }
     }
 
-    public function alias(): string
-    {
-        return 'rcon';
-    }
+    // ── Private helpers ────────────────────────────────────────────
 
     private function validateServerAndCommand(Server $server, array $additional): void
     {
         if (!$server->rcon) {
-            throw new BadConfigurationException("Server $server->name rcon empty");
+            throw new BadConfigurationException("Server {$server->name} rcon empty");
         }
 
         if (!isset($additional['command'])) {
@@ -90,13 +123,13 @@ class RconDriver extends AbstractDriver
         }
     }
 
-    private function getSteamId(User $user, string $command): ?string
+    private function getSteamIdForCommand(User $user, string $command): ?string
     {
         if (preg_match('/{steam32}|{steam64}|{accountId}/i', $command)) {
             $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
 
             if (!$steam) {
-                throw new UserSocialException("Steam");
+                throw new UserSocialException('Steam');
             }
 
             return $steam->value;
@@ -105,26 +138,18 @@ class RconDriver extends AbstractDriver
         return null;
     }
 
-    private function connectToServer(SourceQuery $query, Server $server): void
-    {
-        $settings = method_exists($server, 'getSettings') ? $server->getSettings() : [];
-        $rconPort = isset($settings['rcon_port']) ? (int)$settings['rcon_port'] : (int)$server->port;
-
-        $query->Connect(
-            $server->ip,
-            $rconPort,
-            3,
-            ($server->mod == 10) ? SourceQuery::GOLDSOURCE : SourceQuery::SOURCE
-        );
-        $query->SetRconPassword($server->rcon);
-    }
-
-    private function executeCommands(SourceQuery $query, array $commands, ?string $steam, User $user, array $additional): void
-    {
+    private function executeCommands(
+        RconService $rconService,
+        Server $server,
+        array $commands,
+        ?string $steam,
+        User $user,
+        array $additional,
+    ): void {
         foreach ($commands as $command) {
             try {
-                $this->sendCommand($query, $this->replacePlaceholders($command, $steam, $user, $additional));
-            } catch (\Exception $e) {
+                $rconService->execute($server, $this->replacePlaceholders($command, $steam, $user, $additional));
+            } catch (Exception $e) {
                 if (is_debug()) {
                     throw $e;
                 }
@@ -142,16 +167,18 @@ class RconDriver extends AbstractDriver
             $totalSeconds = (int) $this->time;
 
             $days = intdiv($totalSeconds, 86400);
-            $hours = intdiv($totalSeconds, 3600);
-            $minutes = intdiv($totalSeconds, 60);
-            $seconds = $totalSeconds;
+            $hours = intdiv($totalSeconds % 86400, 3600);
+            $minutes = intdiv($totalSeconds % 3600, 60);
+            $seconds = $totalSeconds % 60;
 
             $unix = time() + $totalSeconds;
         } else {
             $days = $hours = $minutes = $seconds = $unix = 0;
         }
 
-        return str_replace(
+        $sanitize = static fn(string $v): string => str_replace([';', "\n", "\r", '"', "'"], '', $v);
+
+        $command = str_replace(
             [
                 '{steam32}',
                 '{steam64}',
@@ -171,19 +198,27 @@ class RconDriver extends AbstractDriver
                 $steamDetails['steam32'],
                 $steamDetails['steam64'],
                 $steamDetails['accountId'],
-                $user->login,
-                $user->name,
-                $user->email,
-                $user->uri,
+                $sanitize($user->login),
+                $sanitize($user->name),
+                $sanitize($user->email),
+                $sanitize($user->uri),
                 $days,
                 $hours,
                 $minutes,
                 $seconds,
                 $unix,
-                $additional['mc_nick'] ?? '',
+                $sanitize($additional['mc_nick'] ?? ''),
             ],
-            $command
+            $command,
         );
+
+        foreach ($additional as $key => $value) {
+            if (str_starts_with($key, 'cf_')) {
+                $command = str_replace('{' . $key . '}', $sanitize((string) $value), $command);
+            }
+        }
+
+        return $command;
     }
 
     private function getSteamDetails(?string $steam): array
@@ -199,10 +234,5 @@ class RconDriver extends AbstractDriver
         }
 
         return ['steam32' => '', 'steam64' => '', 'accountId' => ''];
-    }
-
-    private function sendCommand(SourceQuery $query, string $command): void
-    {
-        $query->Rcon($command);
     }
 }

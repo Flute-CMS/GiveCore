@@ -2,6 +2,8 @@
 
 namespace Flute\Modules\GiveCore\Exceptions;
 
-class BadConfigurationException extends \Exception
+use Exception;
+
+class BadConfigurationException extends Exception
 {
 }
