@@ -176,7 +176,7 @@ class RconDriver extends AbstractDriver
             $days = $hours = $minutes = $seconds = $unix = 0;
         }
 
-        $sanitize = static fn(string $v): string => str_replace([';', "\n", "\r", '"', "'"], '', $v);
+        $sanitize = static fn($v): string => str_replace([';', "\n", "\r", '"', "'"], '', (string) $v);
 
         $command = str_replace(
             [

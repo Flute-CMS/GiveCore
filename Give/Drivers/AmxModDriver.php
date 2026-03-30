@@ -148,7 +148,7 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
         $prefix = $this->getPrefix($dbConnection->dbname, 'amx_');
         $access = $additional['access'] ?? 'bcdefg';
         $flags = $additional['flags'] ?? 'ce';
-        $time = $timeId ?: $additional['time'] ?? 0;
+        $time = (int) ($timeId ?: ($additional['time'] ?? 0));
         $expiry = $time > 0 ? time() + $time : 0;
         $days = $time > 0 ? (int) ceil($time / 86400) : 0;
 

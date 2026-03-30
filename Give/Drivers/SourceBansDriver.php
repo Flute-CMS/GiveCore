@@ -178,7 +178,7 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
     ): bool {
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
 
-        if (!$steam->value) {
+        if (!$steam?->value) {
             throw new UserSocialException('Steam');
         }
 

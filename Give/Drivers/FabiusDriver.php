@@ -153,7 +153,7 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
     ): bool {
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
 
-        if (!$steam->value) {
+        if (!$steam?->value) {
             throw new UserSocialException('Steam');
         }
 
@@ -169,7 +169,7 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
 
         $accountId = $this->normalizeToAccountId($steam->value);
         $group = $additional['group'];
-        $time = !$timeId ? $additional['time'] ?? 0 : $timeId;
+        $time = (int) ($timeId ?: ($additional['time'] ?? 0));
 
         $db = dbal()->database($dbConnection->dbname);
         $dbusers = $db
@@ -248,10 +248,11 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
             );
         }
 
+        $prefix = $this->getPrefix($dbConnection->dbname, 'vip_');
         $db = dbal()->database($dbConnection->dbname);
         $findServer = $db
             ->select()
-            ->from($this->prefix . 'servers')
+            ->from($prefix . 'servers')
             ->where('serverIp', '=', $server->ip)
             ->where('port', '=', $server->port)
             ->fetchAll();

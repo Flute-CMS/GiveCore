@@ -150,7 +150,7 @@ class LuckPermsDriver extends AbstractDriver implements CheckableInterface
             throw new BadConfigurationException('group', $server->name);
         }
 
-        $time = $timeId ?: $additional['time'] ?? 0;
+        $time = (int) ($timeId ?: ($additional['time'] ?? 0));
         $expiry = $time > 0 ? time() + $time : 0;
         $permission = 'group.' . strtolower(trim($group));
 
