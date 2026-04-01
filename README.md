@@ -8,7 +8,7 @@ Module that extends Flute with support for issuing various privileges with condi
 
 Download the latest release and install it via the Flute CMS admin panel.
 
-Current version: **2.0.0**
+Current version: **2.0.1**
 
 ## Authors
 

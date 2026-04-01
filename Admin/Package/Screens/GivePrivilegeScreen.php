@@ -247,13 +247,6 @@ class GivePrivilegeScreen extends Screen
         try {
             $giveFactory->make($driverAlias, $user, $server, $params, $time > 0 ? $time : null, true);
             toast()->success(__('givecore.admin.deliver_success'))->push();
-        } catch (NeedToConfirmException $e) {
-            try {
-                $giveFactory->make($driverAlias, $user, $server, $params, $time > 0 ? $time : null, true);
-                toast()->success(__('givecore.admin.deliver_success'))->push();
-            } catch (Throwable $e2) {
-                toast()->error(__('givecore.admin.deliver_error', ['error' => $e2->getMessage()]))->push();
-            }
         } catch (Throwable $e) {
             toast()->error(__('givecore.admin.deliver_error', ['error' => $e->getMessage()]))->push();
         }

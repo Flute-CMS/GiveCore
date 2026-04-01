@@ -95,9 +95,7 @@ class CustomSqlDriver extends AbstractDriver
         $db = dbal()->database($dbname);
         $prefix = $this->getPrefix($dbname, '');
 
-        $time = $timeId ?: $additional['time'] ?? 0;
-        $params = $this->buildParams($user, $additional, $time, $prefix);
-
+        $time = (int) ($timeId ?: ($additional['time'] ?? 0));
         $params = $this->buildParams($user, $additional, $time, $prefix);
 
         // Build parameterized query: replace {placeholder} with :placeholder bindings

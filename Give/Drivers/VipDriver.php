@@ -142,7 +142,7 @@ class VipDriver extends AbstractDriver implements CheckableInterface
     ): bool {
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
 
-        if (!$steam->value) {
+        if (!$steam?->value) {
             throw new UserSocialException('Steam');
         }
 
@@ -158,7 +158,7 @@ class VipDriver extends AbstractDriver implements CheckableInterface
         }
 
         $group = $additional['group'];
-        $time = !$timeId ? $additional['time'] ?? 0 : $timeId;
+        $time = (int) ($timeId ?: ($additional['time'] ?? 0));
 
         $db = dbal()->database($dbConnection->dbname);
         $dbusers = $db

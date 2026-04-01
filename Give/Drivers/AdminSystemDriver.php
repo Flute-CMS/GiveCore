@@ -179,7 +179,7 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
         bool $ignoreErrors = false,
     ): bool {
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
-        if (!$steam->value) {
+        if (!$steam?->value) {
             throw new UserSocialException('Steam');
         }
 
