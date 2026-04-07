@@ -43,6 +43,11 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
         return 'CS 1.6';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        return 'Steam';
+    }
+
     public function deliverFields(): array
     {
         return [

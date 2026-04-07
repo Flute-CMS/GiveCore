@@ -48,6 +48,11 @@ class VipDriver extends AbstractDriver implements CheckableInterface
         return 'vip';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        return 'Steam';
+    }
+
     public function deliverFields(): array
     {
         return [
@@ -178,14 +183,21 @@ class VipDriver extends AbstractDriver implements CheckableInterface
                 if (!$ignoreErrors) {
                     $this->confirm(__('givecore.add_time', [
                         ':server' => $server->name,
-                    ]));
+                    ]), null, [
+                        'type' => 'add_time',
+                        'server' => $server->name,
+                    ]);
                 }
             } else {
                 if (!$ignoreErrors) {
                     $this->confirm(__('givecore.replace_group', [
                         ':group' => $dbuser['group'],
                         ':newGroup' => $group,
-                    ]));
+                    ]), null, [
+                        'type' => 'replace_group',
+                        'existingGroup' => $dbuser['group'],
+                        'newGroup' => $group,
+                    ]);
                 }
             }
 

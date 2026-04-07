@@ -62,6 +62,18 @@ class CustomSqlDriver extends AbstractDriver
         return $this->config['category'] ?? 'other';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        $haystack = json_encode($this->config) . json_encode($config);
+        if (preg_match('/\{steam32\}|\{steam64\}|\{accountId\}/i', $haystack)) {
+            return 'Steam';
+        }
+        if (preg_match('/\{nick\}|\{minecraft\}|\{username\}/i', $haystack)) {
+            return 'Minecraft';
+        }
+        return null;
+    }
+
     public function dbConnectionKey(): ?string
     {
         return $this->config['mod_key'] ?? null;
