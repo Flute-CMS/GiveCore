@@ -45,6 +45,11 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
         return 'admin';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        return 'Steam';
+    }
+
     public function deliverFields(): array
     {
         return [
@@ -231,7 +236,11 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
                 $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['name'],
                     ':group' => $groupName,
-                ]));
+                ]), null, [
+                    'type' => 'update_admin',
+                    'existingGroup' => $admin['name'],
+                    'newGroup' => $groupName,
+                ]);
             }
             $adminId = $admin['id'];
 

@@ -41,6 +41,11 @@ class PexDriver extends AbstractDriver implements CheckableInterface
         return 'Minecraft';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        return 'Minecraft';
+    }
+
     public function deliverFields(): array
     {
         return [

@@ -42,6 +42,21 @@ class RconDriver extends AbstractDriver
         return 'rcon';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        $cmd = (string) ($config['command'] ?? '');
+        if ($cmd === '') {
+            return null;
+        }
+        if (preg_match('/\{steam32\}|\{steam64\}|\{accountId\}/i', $cmd)) {
+            return 'Steam';
+        }
+        if (preg_match('/\{nick\}|\{username\}|\{minecraft\}/i', $cmd)) {
+            return 'Minecraft';
+        }
+        return null;
+    }
+
     public function deliverFields(): array
     {
         return [

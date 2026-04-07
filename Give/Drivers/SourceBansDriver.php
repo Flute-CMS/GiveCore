@@ -49,6 +49,11 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
         return 'admin';
     }
 
+    public function requiredSocial(array $config = []): ?string
+    {
+        return 'Steam';
+    }
+
     public function deliverFields(): array
     {
         return [
@@ -211,7 +216,11 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
                 $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['user'],
                     ':group' => $groupName ?: $flags,
-                ]));
+                ]), null, [
+                    'type' => 'update_admin',
+                    'existingGroup' => $admin['user'],
+                    'newGroup' => $groupName ?: $flags,
+                ]);
             }
 
             if (!$simulate) {

@@ -19,7 +19,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected const MOD_KEY = null;
 
-    public function confirm(string $message, ?string $id = null)
+    public function confirm(string $message, ?string $id = null, array $extra = [])
     {
         $id ??= sha1($message);
 
@@ -27,10 +27,10 @@ abstract class AbstractDriver implements DriverInterface
 
         if (!$validate) {
             throw new NeedToConfirmException([
-                'confirm' => [
+                'confirm' => array_merge([
                     'message' => $message,
                     'id' => $id,
-                ],
+                ], $extra),
             ]);
         }
     }
@@ -121,5 +121,17 @@ abstract class AbstractDriver implements DriverInterface
         }
 
         return __('givecore.no_servers', ['key' => $this->dbConnectionKey() ?? '']);
+    }
+
+    /**
+     * Required social network alias for delivery (e.g. 'Steam', 'Minecraft'),
+     * or null if delivery does not require any social linkage.
+     *
+     * Concrete drivers that resolve a Steam/Minecraft id during deliver()
+     * should override this so callers can check beforehand.
+     */
+    public function requiredSocial(array $config = []): ?string
+    {
+        return null;
     }
 }
