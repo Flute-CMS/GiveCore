@@ -9,6 +9,7 @@ use Flute\Modules\GiveCore\Contracts\CheckableInterface;
 use Flute\Modules\GiveCore\Contracts\DriverInterface;
 use Flute\Modules\GiveCore\Give\Drivers\AdminSystemDriver;
 use Flute\Modules\GiveCore\Give\Drivers\AmxModDriver;
+use Flute\Modules\GiveCore\Give\Drivers\AmxUnbanDriver;
 use Flute\Modules\GiveCore\Give\Drivers\FabiusDriver;
 use Flute\Modules\GiveCore\Give\Drivers\K4SystemDriver;
 use Flute\Modules\GiveCore\Give\Drivers\LiteBansDriver;
@@ -29,6 +30,7 @@ class GiveFactory
         'luckperms' => LuckPermsDriver::class,
         'pex' => PexDriver::class,
         'amxmod' => AmxModDriver::class,
+        'amxunban' => AmxUnbanDriver::class,
         'k4system' => K4SystemDriver::class,
         'litebans' => LiteBansDriver::class,
     ];

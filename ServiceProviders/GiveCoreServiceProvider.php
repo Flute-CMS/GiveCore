@@ -31,6 +31,7 @@ use Flute\Modules\GiveCore\Check\Drivers\Stats\RankMeConditionDriver;
 use Flute\Modules\GiveCore\Drivers\FabiusVIPModDriver;
 use Flute\Modules\GiveCore\Drivers\VIPModDriver;
 use Flute\Modules\GiveCore\Give\GiveFactory;
+use Flute\Modules\GiveCore\Services\AmxExpiredCleanupService;
 use Flute\Modules\GiveCore\Services\CustomDriverService;
 
 class GiveCoreServiceProvider extends ModuleServiceProvider
@@ -93,6 +94,12 @@ class GiveCoreServiceProvider extends ModuleServiceProvider
         $customService = new CustomDriverService();
         $container->set(CustomDriverService::class, $customService);
         $customService->registerAll();
+
+        if (config('app.cron_mode')) {
+            scheduler()->call(static function (): void {
+                (new AmxExpiredCleanupService())->cleanup();
+            })->daily('04:00');
+        }
 
         if (is_admin_path()) {
             $this->loadPackage(new GiveCorePackage());
