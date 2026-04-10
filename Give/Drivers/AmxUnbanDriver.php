@@ -1,0 +1,122 @@
+<?php
+
+namespace Flute\Modules\GiveCore\Give\Drivers;
+
+use Flute\Core\Database\Entities\Server;
+use Flute\Core\Database\Entities\User;
+use Flute\Core\Rcon\RconService;
+use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
+use Flute\Modules\GiveCore\Exceptions\GiveDriverException;
+use Flute\Modules\GiveCore\Exceptions\UserSocialException;
+use Flute\Modules\GiveCore\Support\AbstractDriver;
+
+class AmxUnbanDriver extends AbstractDriver
+{
+    protected const MOD_KEY = 'AmxModX';
+
+    public function alias(): string
+    {
+        return 'amxunban';
+    }
+
+    public function name(): string
+    {
+        return __('givecore.drivers.amxunban.name');
+    }
+
+    public function description(): string
+    {
+        return __('givecore.drivers.amxunban.description');
+    }
+
+    public function icon(): string
+    {
+        return 'ph.bold.shield-slash-bold';
+    }
+
+    public function category(): string
+    {
+        return 'CS 1.6';
+    }
+
+    public function requiredSocial(array $config = []): ?string
+    {
+        return 'Steam';
+    }
+
+    public function deliverFields(): array
+    {
+        return [];
+    }
+
+    public function deliver(
+        User $user,
+        Server $server,
+        array $additional = [],
+        ?int $timeId = null,
+        bool $ignoreErrors = false,
+    ): bool {
+        $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
+        if (!$steam?->value) {
+            throw new UserSocialException('Steam');
+        }
+
+        $dbConnection = $server->getDbConnection(static::MOD_KEY);
+        if (!$dbConnection) {
+            throw new BadConfigurationException(static::MOD_KEY, $server->name);
+        }
+
+        $prefix = $this->getPrefix($dbConnection->dbname, 'amx_');
+        $db = dbal()->database($dbConnection->dbname);
+
+        $steamId2 = steam()->steamid($steam->value)->RenderSteam2();
+
+        $activeBans = $db
+            ->select()
+            ->from($prefix . 'bans')
+            ->where('player_id', $steamId2)
+            ->where('expired', 0)
+            ->fetchAll();
+
+        if (empty($activeBans)) {
+            $valveId = 'VALVE_' . substr($steamId2, 6);
+            $activeBans = $db
+                ->select()
+                ->from($prefix . 'bans')
+                ->where('player_id', $valveId)
+                ->where('expired', 0)
+                ->fetchAll();
+        }
+
+        if (empty($activeBans)) {
+            if (!$ignoreErrors) {
+                throw new GiveDriverException(__('givecore.drivers.amxunban.no_active_ban'));
+            }
+
+            return false;
+        }
+
+        foreach ($activeBans as $ban) {
+            $db->update($prefix . 'bans', ['expired' => 1])
+                ->where('bid', $ban['bid'])
+                ->run();
+        }
+
+        $this->sendRcon($server, 'amx_reloadadmins');
+
+        return true;
+    }
+
+    protected function sendRcon(Server $server, string $command): void
+    {
+        try {
+            $rconService = app(RconService::class);
+
+            if ($rconService->isAvailable($server)) {
+                $rconService->execute($server, $command);
+            }
+        } catch (\Throwable $e) {
+            // RCON is optional
+        }
+    }
+}
