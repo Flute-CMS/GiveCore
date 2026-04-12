@@ -38,6 +38,16 @@ class K4SystemDriver extends AbstractDriver
         return 'CS2';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/KitsuneLab-Development/K4-System';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';

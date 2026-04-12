@@ -48,6 +48,16 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
         return 'vip';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/partiusfabaa/cs2-LiteVIP';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';

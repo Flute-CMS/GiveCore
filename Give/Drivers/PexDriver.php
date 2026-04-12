@@ -41,6 +41,16 @@ class PexDriver extends AbstractDriver implements CheckableInterface
         return 'Minecraft';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/PEXPlugins/PermissionsEx';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['Minecraft'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Minecraft';

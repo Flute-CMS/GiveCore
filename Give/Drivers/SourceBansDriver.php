@@ -49,6 +49,16 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
         return 'admin';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/sbpp/sourcebans-pp';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2', 'CS:GO', 'CS:S', 'TF2', 'Garry\'s Mod'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';

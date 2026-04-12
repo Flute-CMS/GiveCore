@@ -42,6 +42,11 @@ class RconDriver extends AbstractDriver
         return 'rcon';
     }
 
+    public function supportedGames(): array
+    {
+        return ['CS2', 'CS:GO', 'CS 1.6', 'Minecraft', 'TF2', 'Garry\'s Mod'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         $cmd = (string) ($config['command'] ?? '');

@@ -149,11 +149,6 @@ return [
             'description' => 'Перевірка статистики в K4-System (CS2)',
             'no_servers' => 'Немає серверів з підключенням K4',
         ],
-        'k4system' => [
-            'name' => 'K4-System',
-            'description' => 'Перевірка статистики в K4-System (CS2)',
-            'no_servers' => 'Немає серверів з підключенням K4',
-        ],
     ],
 
     'fields' => [

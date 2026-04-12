@@ -42,6 +42,16 @@ class LuckPermsDriver extends AbstractDriver implements CheckableInterface
         return 'Minecraft';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://luckperms.net';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['Minecraft'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Minecraft';

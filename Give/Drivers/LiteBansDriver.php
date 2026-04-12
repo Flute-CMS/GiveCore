@@ -38,6 +38,16 @@ class LiteBansDriver extends AbstractDriver
         return 'Minecraft';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://www.spigotmc.org/resources/litebans.3715/';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['Minecraft'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Minecraft';

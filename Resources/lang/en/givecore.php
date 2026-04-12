@@ -20,9 +20,26 @@ return [
             'name' => 'AdminSystem',
             'description' => 'Grant/check admin privileges via AdminSystem (MateSystem)',
         ],
+        'iks' => [
+            'name' => 'IKS Admin',
+            'description' => 'Grant/check admin privileges via IKS Admin',
+        ],
+        'simpleadmin' => [
+            'name' => 'SimpleAdmin',
+            'description' => 'Grant/check admin privileges via CS2-SimpleAdmin',
+        ],
         'sourcebans' => [
             'name' => 'SourceBans',
             'description' => 'Grant/check admin privileges via SourceBans/SourceBans++',
+        ],
+        'freshbans' => [
+            'name' => 'Fresh Bans',
+            'description' => 'Unban player via Fresh Bans (CS 1.6)',
+            'no_active_ban' => 'No active bans found for this player',
+        ],
+        'freshbans_admin' => [
+            'name' => 'Fresh Bans Admin',
+            'description' => 'Deliver admin privileges via Fresh Bans (CS 1.6)',
         ],
         'rcon' => [
             'name' => 'RCON',
@@ -210,11 +227,6 @@ return [
             'description' => 'Check statistics in K4-System (CS2)',
             'no_servers' => 'No servers with K4 connection',
         ],
-        'k4system' => [
-            'name' => 'K4-System',
-            'description' => 'Check statistics in K4-System (CS2)',
-            'no_servers' => 'No servers with K4 connection',
-        ],
     ],
 
     'fields' => [
@@ -234,6 +246,10 @@ return [
         'sb_flags_help' => 'Access flags (e.g.: abcdefghijklmnopqrstz). Optional if delivering a group',
         'as_group_help' => 'AdminSystem group ID. Optional if delivering flags only',
         'as_flags_help' => 'Access flags. Optional if delivering a group',
+        'iks_group_help' => 'IKS Admin group name. Optional if delivering flags only',
+        'iks_flags_help' => 'Access flags. Optional if delivering a group',
+        'sa_group_help' => 'SimpleAdmin group name. Optional if delivering flags only',
+        'sa_flags_help' => 'Access flags. Optional if delivering a group',
         'comment' => 'Comment',
         'password' => 'Password',
         'password_placeholder' => 'Will be auto-generated',
@@ -363,7 +379,6 @@ return [
         'alias_help' => 'Unique identifier (lowercase letters, digits, _)',
         'name' => 'Name',
         'name_help' => 'Display name in the interface',
-        'description' => 'Description',
         'icon' => 'Icon',
         'icon_help' => 'Phosphor Icons (e.g.: ph.bold.plug-bold)',
         'category' => 'Category',

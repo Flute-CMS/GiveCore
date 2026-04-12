@@ -45,6 +45,16 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
         return 'admin';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/Pisex/cs2-bans';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';

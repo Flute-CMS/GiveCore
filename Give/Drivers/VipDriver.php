@@ -48,6 +48,16 @@ class VipDriver extends AbstractDriver implements CheckableInterface
         return 'vip';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/partiusfabaa/cs2-VIPCore';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2', 'CS:GO'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';

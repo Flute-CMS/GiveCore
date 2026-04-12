@@ -21,9 +21,26 @@ return [
             'name' => 'AdminSystem',
             'description' => 'Выдача/проверка админ-привилегий через AdminSystem (MateSystem)',
         ],
+        'iks' => [
+            'name' => 'IKS Admin',
+            'description' => 'Выдача/проверка админ-привилегий через IKS Admin',
+        ],
+        'simpleadmin' => [
+            'name' => 'SimpleAdmin',
+            'description' => 'Выдача/проверка админ-привилегий через CS2-SimpleAdmin',
+        ],
         'sourcebans' => [
             'name' => 'SourceBans',
             'description' => 'Выдача/проверка админ-привилегий через SourceBans/SourceBans++',
+        ],
+        'freshbans' => [
+            'name' => 'Fresh Bans',
+            'description' => 'Разбан через Fresh Bans (CS 1.6)',
+            'no_active_ban' => 'Активных банов не найдено',
+        ],
+        'freshbans_admin' => [
+            'name' => 'Fresh Bans Admin',
+            'description' => 'Выдача админ-привилегий через Fresh Bans (CS 1.6)',
         ],
         'rcon' => [
             'name' => 'RCON',
@@ -218,11 +235,6 @@ return [
             'description' => 'Проверка статистики в K4-System (CS2)',
             'no_servers' => 'Нет серверов с подключением K4',
         ],
-        'k4system' => [
-            'name' => 'K4-System',
-            'description' => 'Проверка статистики в K4-System (CS2)',
-            'no_servers' => 'Нет серверов с подключением K4',
-        ],
     ],
 
     'fields' => [
@@ -242,6 +254,10 @@ return [
         'sb_flags_help' => 'Флаги доступа (например: abcdefghijklmnopqrstz). Можно не указывать, если выдаёте группу',
         'as_group_help' => 'ID группы AdminSystem. Можно не указывать, если выдаёте только флаги',
         'as_flags_help' => 'Флаги доступа. Можно не указывать, если выдаёте группу',
+        'iks_group_help' => 'Название группы IKS Admin. Можно не указывать, если выдаёте только флаги',
+        'iks_flags_help' => 'Флаги доступа. Можно не указывать, если выдаёте группу',
+        'sa_group_help' => 'Название группы SimpleAdmin. Можно не указывать, если выдаёте только флаги',
+        'sa_flags_help' => 'Флаги доступа. Можно не указывать, если выдаёте группу',
         'comment' => 'Комментарий',
         'password' => 'Пароль',
         'password_placeholder' => 'Будет сгенерирован автоматически',
@@ -374,7 +390,6 @@ return [
         'alias_help' => 'Уникальный идентификатор (латиница, цифры, _)',
         'name' => 'Название',
         'name_help' => 'Отображаемое имя в интерфейсе',
-        'description' => 'Описание',
         'icon' => 'Иконка',
         'icon_help' => 'Phosphor Icons (например: ph.bold.plug-bold)',
         'category' => 'Категория',

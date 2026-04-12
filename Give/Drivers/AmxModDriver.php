@@ -66,6 +66,16 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
         return 'CS 1.6';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/alliedmodders/amxmodx';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS 1.6', 'Half-Life'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         $bindType = $config['bind_type'] ?? self::BIND_STEAMID;

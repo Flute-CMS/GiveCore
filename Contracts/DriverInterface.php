@@ -70,4 +70,14 @@ interface DriverInterface
      * Why the driver is unavailable, or null.
      */
     public function unavailableReason(): ?string;
+
+    /**
+     * URL to the plugin/mod source (GitHub, AlliedMods, etc.), or null.
+     */
+    public function sourceUrl(): ?string;
+
+    /**
+     * List of supported games/engines (e.g. ['CS2', 'CS:GO'] or ['Minecraft']).
+     */
+    public function supportedGames(): array;
 }
