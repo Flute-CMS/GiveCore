@@ -355,39 +355,43 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
         if (!empty($existing)) {
             $record = $existing[0];
             $currentExpiry = (int) $record['expired'];
+            $isActive = $currentExpiry === 0 || $currentExpiry > time();
 
-            if ($currentExpiry === 0 || $currentExpiry > time()) {
-                if (!$ignoreErrors) {
-                    $newExpiry = $expiry > 0 ? max($currentExpiry, time()) + $time : 0;
+            if ($isActive && !$ignoreErrors) {
+                $newExpiry = $expiry > 0 ? max($currentExpiry, time()) + $time : 0;
 
-                    $updateData = [
-                        'access' => $access,
-                        'flags' => $authFlags,
-                        'expired' => $newExpiry,
-                        'days' => $newExpiry > 0 ? (int) ceil(($newExpiry - time()) / 86400) : 0,
-                        'nickname' => $nickname,
-                    ];
+                $updateData = [
+                    'access' => $access,
+                    'flags' => $authFlags,
+                    'expired' => $newExpiry,
+                    'days' => $newExpiry > 0 ? (int) ceil(($newExpiry - time()) / 86400) : 0,
+                    'nickname' => $nickname,
+                ];
 
-                    if ($password !== '') {
-                        $updateData['password'] = $password;
-                    }
-
-                    if (!$simulate) {
-                        $db
-                            ->update($prefix . 'amxadmins', $updateData)
-                            ->where('id', $record['id'])
-                            ->run();
-                    }
-
-                    return !$simulate;
+                if ($password !== '') {
+                    $updateData['password'] = $password;
                 }
+
+                if (!$simulate) {
+                    $db
+                        ->update($prefix . 'amxadmins', $updateData)
+                        ->where('id', $record['id'])
+                        ->run();
+
+                    $this->ensureAdminServer($db, $prefix, $dbConnection, $server, (int) $record['id']);
+                    $this->sendRcon($server, 'amx_reloadadmins');
+                }
+
+                return !$simulate;
             }
+
+            $newExpiry = $isActive && $expiry > 0 ? max($currentExpiry, time()) + $time : $expiry;
 
             $updateData = [
                 'access' => $access,
                 'flags' => $authFlags,
-                'expired' => $expiry,
-                'days' => $days,
+                'expired' => $newExpiry,
+                'days' => $newExpiry > 0 ? (int) ceil(($newExpiry - time()) / 86400) : 0,
                 'nickname' => $nickname,
                 'created' => time(),
             ];
@@ -401,13 +405,16 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
                     ->update($prefix . 'amxadmins', $updateData)
                     ->where('id', $record['id'])
                     ->run();
+
+                $this->ensureAdminServer($db, $prefix, $dbConnection, $server, (int) $record['id']);
+                $this->sendRcon($server, 'amx_reloadadmins');
             }
 
             return !$simulate;
         }
 
         if (!$simulate) {
-            $db
+            $insertedId = $db
                 ->insert($prefix . 'amxadmins')
                 ->values([
                     'username' => $nickname,
@@ -423,31 +430,8 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
                 ])
                 ->run();
 
-            $dbParams = Json::decode($dbConnection->additional ?? '{}');
-            $serverId = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
-
-            if ($serverId > 0) {
-                try {
-                    $adminId = $db
-                        ->select('MAX(id) as id')
-                        ->from($prefix . 'amxadmins')
-                        ->where('steamid', $authIdentifier)
-                        ->fetchAll();
-
-                    if (!empty($adminId)) {
-                        $db
-                            ->insert($prefix . 'admins_servers')
-                            ->values([
-                                'admin_id' => $adminId[0]['id'],
-                                'server_id' => $serverId,
-                                'custom_flags' => '',
-                                'use_static_bantime' => 'yes',
-                            ])
-                            ->run();
-                    }
-                } catch (\Throwable $e) {
-                    // admins_servers table may not exist in simpler setups
-                }
+            if ($insertedId) {
+                $this->ensureAdminServer($db, $prefix, $dbConnection, $server, (int) $insertedId);
             }
 
             $this->sendRcon($server, 'amx_reloadadmins');
@@ -523,6 +507,94 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
         }
 
         return '';
+    }
+
+    protected function ensureAdminServer(
+        $db,
+        string $prefix,
+        $dbConnection,
+        Server $server,
+        int $adminId,
+    ): void {
+        $amxServerId = $this->resolveAmxServerId($db, $prefix, $dbConnection, $server);
+
+        if ($amxServerId <= 0) {
+            return;
+        }
+
+        try {
+            $existing = $db
+                ->select()
+                ->from($prefix . 'admins_servers')
+                ->where('admin_id', $adminId)
+                ->where('server_id', $amxServerId)
+                ->fetchAll();
+
+            if (empty($existing)) {
+                $db
+                    ->insert($prefix . 'admins_servers')
+                    ->values([
+                        'admin_id' => $adminId,
+                        'server_id' => $amxServerId,
+                        'custom_flags' => '',
+                        'use_static_bantime' => 'yes',
+                    ])
+                    ->run();
+            }
+        } catch (\Throwable $e) {
+            // admins_servers table may not exist in simpler setups
+        }
+    }
+
+    protected function resolveAmxServerId(
+        $db,
+        string $prefix,
+        $dbConnection,
+        Server $server,
+    ): int {
+        $dbParams = Json::decode($dbConnection->additional ?? '{}');
+        $explicit = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
+
+        if ($explicit > 0) {
+            return $explicit;
+        }
+
+        $foundId = 0;
+
+        try {
+            $address = $server->ip . ':' . $server->port;
+
+            $row = $db
+                ->select('id')
+                ->from($prefix . 'serverinfo')
+                ->where('address', $address)
+                ->fetchAll();
+
+            if (!empty($row)) {
+                $foundId = (int) $row[0]['id'];
+            }
+
+        } catch (\Throwable $e) {
+            // serverinfo table may not exist
+        }
+
+        if ($foundId > 0) {
+            $this->persistAmxServerId($dbConnection, $foundId);
+        }
+
+        return $foundId;
+    }
+
+    protected function persistAmxServerId($dbConnection, int $sid): void
+    {
+        try {
+            $data = json_decode($dbConnection->additional ?? '{}', true) ?: [];
+            $data['sid'] = $sid;
+            $dbConnection->additional = json_encode($data);
+            $dbConnection->saveOrFail();
+        } catch (\Throwable $e) {
+            // non-critical
+        }
     }
 
     protected function sendRcon(Server $server, string $command): void

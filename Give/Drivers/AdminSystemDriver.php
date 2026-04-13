@@ -9,6 +9,7 @@ use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
 use Flute\Modules\GiveCore\Support\CheckableTrait;
+use Nette\Utils\Json;
 
 class AdminSystemDriver extends AbstractDriver implements CheckableInterface
 {
@@ -355,8 +356,51 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
             throw BadConfigurationException::noDbConnection('AdminSystem', $server->name);
         }
 
-        $serverId = isset($additional['sid']) ? (int) $additional['sid'] : (int) ( $server->id ?? 0 );
+        $serverId = isset($additional['sid']) ? (int) $additional['sid'] : 0;
+
+        if ($serverId <= 0) {
+            $serverId = $this->resolveExternalServerId($dbConnection, $server);
+        }
 
         return [$dbConnection, $serverId];
+    }
+
+    protected function resolveExternalServerId($dbConnection, Server $server): int
+    {
+        $dbParams = Json::decode($dbConnection->additional ?? '{}');
+        $explicit = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
+
+        if ($explicit > 0) {
+            return $explicit;
+        }
+
+        $prefix = $this->prefix ?? $this->getPrefix($dbConnection->dbname, 'as_');
+        $db = dbal()->database($dbConnection->dbname);
+        $address = $server->ip . ':' . $server->port;
+
+        try {
+            $row = $db->select('id')->from($prefix . 'servers')
+                ->where('address', $address)
+                ->fetchAll();
+
+            if (!empty($row)) {
+                $this->persistSid($dbConnection, (int) $row[0]['id']);
+                return (int) $row[0]['id'];
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return 0;
+    }
+
+    protected function persistSid($dbConnection, int $sid): void
+    {
+        try {
+            $data = json_decode($dbConnection->additional ?? '{}', true) ?: [];
+            $data['sid'] = $sid;
+            $dbConnection->additional = json_encode($data);
+            $dbConnection->saveOrFail();
+        } catch (\Throwable $e) {
+        }
     }
 }

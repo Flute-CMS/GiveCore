@@ -10,6 +10,7 @@ use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
 use Flute\Modules\GiveCore\Support\CheckableTrait;
+use Nette\Utils\Json;
 
 class FreshBansAdminDriver extends AbstractDriver implements CheckableInterface
 {
@@ -365,8 +366,10 @@ class FreshBansAdminDriver extends AbstractDriver implements CheckableInterface
                     ->update($prefix . 'amxadmins', $updateData)
                     ->where('id', $record['id'])
                     ->run();
+
+                $this->ensureAdminServer($db, $prefix, $dbConnection, $server, (int) $record['id']);
             } else {
-                $db
+                $insertedId = $db
                     ->insert($prefix . 'amxadmins')
                     ->values([
                         'username' => $nickname,
@@ -381,18 +384,93 @@ class FreshBansAdminDriver extends AbstractDriver implements CheckableInterface
                         'days' => $days,
                     ])
                     ->run();
+
+                if ($insertedId) {
+                    $this->ensureAdminServer($db, $prefix, $dbConnection, $server, (int) $insertedId);
+                }
             }
 
+            $this->sendRcon($server, 'amx_reloadadmins');
+        }
+
+        return !$simulate;
+    }
+
+    protected function ensureAdminServer($db, string $prefix, $dbConnection, Server $server, int $adminId): void
+    {
+        $amxServerId = $this->resolveAmxServerId($db, $prefix, $dbConnection, $server);
+
+        if ($amxServerId <= 0) {
+            return;
+        }
+
+        try {
+            $existing = $db
+                ->select()
+                ->from($prefix . 'admins_servers')
+                ->where('admin_id', $adminId)
+                ->where('server_id', $amxServerId)
+                ->fetchAll();
+
+            if (empty($existing)) {
+                $db
+                    ->insert($prefix . 'admins_servers')
+                    ->values([
+                        'admin_id' => $adminId,
+                        'server_id' => $amxServerId,
+                        'custom_flags' => '',
+                        'use_static_bantime' => 'no',
+                    ])
+                    ->run();
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
+    protected function resolveAmxServerId($db, string $prefix, $dbConnection, Server $server): int
+    {
+        $dbParams = Json::decode($dbConnection->additional ?? '{}');
+        $explicit = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
+
+        if ($explicit > 0) {
+            return $explicit;
+        }
+
+        $foundId = 0;
+
+        try {
+            $address = $server->ip . ':' . $server->port;
+
+            $row = $db->select('id')->from($prefix . 'serverinfo')->where('address', $address)->fetchAll();
+            if (!empty($row)) {
+                $foundId = (int) $row[0]['id'];
+            }
+
+        } catch (\Throwable $e) {
+        }
+
+        if ($foundId > 0) {
             try {
-                $rconService = app(RconService::class);
-                if ($rconService->isAvailable($server)) {
-                    $rconService->execute($server, 'amx_reloadadmins');
-                }
+                $data = json_decode($dbConnection->additional ?? '{}', true) ?: [];
+                $data['sid'] = $foundId;
+                $dbConnection->additional = json_encode($data);
+                $dbConnection->saveOrFail();
             } catch (\Throwable $e) {
             }
         }
 
-        return !$simulate;
+        return $foundId;
+    }
+
+    protected function sendRcon(Server $server, string $command): void
+    {
+        try {
+            $rconService = app(RconService::class);
+            if ($rconService->isAvailable($server)) {
+                $rconService->execute($server, $command);
+            }
+        } catch (\Throwable $e) {
+        }
     }
 
     protected function resolveBindType(array $additional): string
