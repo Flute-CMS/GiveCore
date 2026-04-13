@@ -87,21 +87,11 @@ class FreshBansUnbanDriver extends AbstractDriver
 
         $steamId2 = steam()->steamid($steam->value)->RenderSteam2();
 
-        $activeBans = $db
-            ->select()
-            ->from($prefix . 'bans')
-            ->where('player_id', $steamId2)
-            ->where('expired', 0)
-            ->fetchAll();
+        $activeBans = $this->findActiveBans($db, $prefix, $steamId2);
 
         if (empty($activeBans)) {
             $valveId = 'VALVE_' . substr($steamId2, 6);
-            $activeBans = $db
-                ->select()
-                ->from($prefix . 'bans')
-                ->where('player_id', $valveId)
-                ->where('expired', 0)
-                ->fetchAll();
+            $activeBans = $this->findActiveBans($db, $prefix, $valveId);
         }
 
         if (empty($activeBans)) {
@@ -114,8 +104,12 @@ class FreshBansUnbanDriver extends AbstractDriver
 
         if (!$simulate) {
             foreach ($activeBans as $ban) {
-                $db->update($prefix . 'bans', ['expired' => 1])
-                    ->where('id', $ban['id'])
+                $db->update($prefix . 'bans', [
+                    'expired' => 1,
+                    'unban_type' => -2,
+                    'ban_closed' => $user->id,
+                ])
+                    ->where('bid', $ban['bid'])
                     ->run();
             }
 
@@ -129,5 +123,28 @@ class FreshBansUnbanDriver extends AbstractDriver
         }
 
         return !$simulate;
+    }
+
+    protected function findActiveBans($db, string $prefix, string $playerId): array
+    {
+        $bans = $db
+            ->select()
+            ->from($prefix . 'bans')
+            ->where('player_id', $playerId)
+            ->where('expired', 0)
+            ->fetchAll();
+
+        $now = time();
+
+        return array_filter($bans, static function ($ban) use ($now) {
+            $banLength = (int) ($ban['ban_length'] ?? 0);
+            $banCreated = (int) ($ban['ban_created'] ?? 0);
+
+            if ($banLength === 0) {
+                return true;
+            }
+
+            return ($banCreated + $banLength * 60) > $now;
+        });
     }
 }

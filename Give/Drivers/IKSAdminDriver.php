@@ -9,6 +9,7 @@ use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
 use Flute\Modules\GiveCore\Support\CheckableTrait;
+use Nette\Utils\Json;
 
 class IKSAdminDriver extends AbstractDriver implements CheckableInterface
 {
@@ -205,7 +206,7 @@ class IKSAdminDriver extends AbstractDriver implements CheckableInterface
         $immunity = (int) ($additional['immunity'] ?? 0);
         $time = $timeId ?? (int) ($additional['time'] ?? 0);
 
-        $serverId = (int) ($server->id ?? 0);
+        $serverId = $this->resolveExternalServerId($dbConnection, $server);
 
         $existing = $db
             ->select()
@@ -267,5 +268,44 @@ class IKSAdminDriver extends AbstractDriver implements CheckableInterface
         }
 
         return !$simulate;
+    }
+
+    protected function resolveExternalServerId($dbConnection, Server $server): int
+    {
+        $dbParams = Json::decode($dbConnection->additional ?? '{}');
+        $explicit = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
+
+        if ($explicit > 0) {
+            return $explicit;
+        }
+
+        $prefix = $this->prefix ?? $this->getPrefix($dbConnection->dbname, 'iks_');
+        $db = dbal()->database($dbConnection->dbname);
+        $address = $server->ip . ':' . $server->port;
+
+        try {
+            $row = $db->select('id')->from($prefix . 'servers')
+                ->where('address', $address)
+                ->fetchAll();
+
+            if (!empty($row)) {
+                $this->persistSid($dbConnection, (int) $row[0]['id']);
+                return (int) $row[0]['id'];
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return 0;
+    }
+
+    protected function persistSid($dbConnection, int $sid): void
+    {
+        try {
+            $data = json_decode($dbConnection->additional ?? '{}', true) ?: [];
+            $data['sid'] = $sid;
+            $dbConnection->additional = json_encode($data);
+            $dbConnection->saveOrFail();
+        } catch (\Throwable $e) {
+        }
     }
 }
