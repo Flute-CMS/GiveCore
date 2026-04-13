@@ -48,6 +48,16 @@ class VipDriver extends AbstractDriver implements CheckableInterface
         return 'vip';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/partiusfabaa/cs2-VIPCore';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2', 'CS:GO'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';
@@ -173,23 +183,24 @@ class VipDriver extends AbstractDriver implements CheckableInterface
             ->andWhere('sid', $sid)
             ->fetchAll();
 
-        if (!empty($dbusers)) {
+        $hasActiveRecord = !empty($dbusers)
+            && ((int) $dbusers[0]['expires'] === 0 || (int) $dbusers[0]['expires'] >= time());
+
+        if (!empty($dbusers) && $hasActiveRecord) {
             $dbuser = $dbusers[0];
 
             $currentGroup = trim(strtolower($dbuser['group']));
             $desiredGroup = trim(strtolower($group));
 
-            if ($currentGroup === $desiredGroup) {
-                if (!$ignoreErrors) {
+            if ($simulate && !$ignoreErrors) {
+                if ($currentGroup === $desiredGroup) {
                     $this->confirm(__('givecore.add_time', [
                         ':server' => $server->name,
                     ]), null, [
                         'type' => 'add_time',
                         'server' => $server->name,
                     ]);
-                }
-            } else {
-                if (!$ignoreErrors) {
+                } else {
                     $this->confirm(__('givecore.replace_group', [
                         ':group' => $dbuser['group'],
                         ':newGroup' => $group,
@@ -203,6 +214,10 @@ class VipDriver extends AbstractDriver implements CheckableInterface
 
             if (!$simulate) {
                 $this->updateOrInsertUser($db, $accountId, $sid, $group, $time, $user, $dbuser);
+            }
+        } else if (!empty($dbusers)) {
+            if (!$simulate) {
+                $this->updateOrInsertUser($db, $accountId, $sid, $group, $time, $user, $dbusers[0]);
             }
         } else {
             if (!$simulate) {
@@ -231,17 +246,17 @@ class VipDriver extends AbstractDriver implements CheckableInterface
     private function validateAdditionalParams(array $additional, Server $server): array
     {
         if (empty($additional['group'])) {
-            throw new BadConfigurationException('group in configuration is required');
+            throw BadConfigurationException::noGroup($server->name);
         }
 
         $dbConnection = $server->getDbConnection('VIP');
         if (!$dbConnection) {
-            throw new BadConfigurationException('db connection VIP is not exists (server: ' . $server->name . ')');
+            throw BadConfigurationException::noDbConnection('VIP', $server->name);
         }
 
         $dbParams = Json::decode($dbConnection->additional);
         if (!isset($dbParams->sid) || $dbParams->sid === '' || $dbParams->sid === null) {
-            throw new BadConfigurationException("SID {$server->name} for db connection is empty");
+            throw BadConfigurationException::noDbConnection('VIP SID', $server->name);
         }
 
         return [$dbConnection, (int) $dbParams->sid];

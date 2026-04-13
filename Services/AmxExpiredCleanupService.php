@@ -7,7 +7,7 @@ use Flute\Core\Rcon\RconService;
 
 class AmxExpiredCleanupService
 {
-    protected const MOD_KEY = 'AmxModX';
+    protected const MOD_KEY = 'Amx';
 
     public function cleanup(): void
     {

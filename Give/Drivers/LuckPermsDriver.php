@@ -42,6 +42,16 @@ class LuckPermsDriver extends AbstractDriver implements CheckableInterface
         return 'Minecraft';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://luckperms.net';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['Minecraft'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Minecraft';
@@ -139,6 +149,12 @@ class LuckPermsDriver extends AbstractDriver implements CheckableInterface
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $uuid = $this->getUserMinecraftUuid($user);
         if (!$uuid) {
             throw new UserSocialException('Minecraft');
@@ -152,7 +168,7 @@ class LuckPermsDriver extends AbstractDriver implements CheckableInterface
         $prefix = $this->getPrefix($dbConnection->dbname, 'luckperms_');
         $group = $additional['group'] ?? null;
         if (empty($group)) {
-            throw new BadConfigurationException('group', $server->name);
+            throw BadConfigurationException::noGroup($server->name);
         }
 
         $time = (int) ($timeId ?: ($additional['time'] ?? 0));
@@ -168,50 +184,52 @@ class LuckPermsDriver extends AbstractDriver implements CheckableInterface
             ->where('uuid', $uuid)
             ->fetchAll();
 
-        if (empty($existing)) {
-            $username = $user->name ?? 'Player';
+        if (!$simulate) {
+            if (empty($existing)) {
+                $username = $user->name ?? 'Player';
+                $db
+                    ->insert($prefix . 'players')
+                    ->values([
+                        'uuid' => $uuid,
+                        'username' => $username,
+                        'primary_group' => 'default',
+                    ])
+                    ->run();
+            }
+
+            // Remove existing group permission if present
             $db
-                ->insert($prefix . 'players')
+                ->delete($prefix . 'user_permissions')
+                ->where('uuid', $uuid)
+                ->andWhere('permission', $permission)
+                ->run();
+
+            // Insert new group permission
+            $db
+                ->insert($prefix . 'user_permissions')
                 ->values([
                     'uuid' => $uuid,
-                    'username' => $username,
-                    'primary_group' => 'default',
+                    'permission' => $permission,
+                    'value' => 1,
+                    'server' => 'global',
+                    'world' => 'global',
+                    'expiry' => $expiry,
+                    'contexts' => '{}',
                 ])
                 ->run();
+
+            // Update primary group
+            $db
+                ->update($prefix . 'players')
+                ->set('primary_group', strtolower(trim($group)))
+                ->where('uuid', $uuid)
+                ->run();
+
+            // Send sync command via RCON if possible
+            $this->sendRcon($server, 'lp sync');
         }
 
-        // Remove existing group permission if present
-        $db
-            ->delete($prefix . 'user_permissions')
-            ->where('uuid', $uuid)
-            ->andWhere('permission', $permission)
-            ->run();
-
-        // Insert new group permission
-        $db
-            ->insert($prefix . 'user_permissions')
-            ->values([
-                'uuid' => $uuid,
-                'permission' => $permission,
-                'value' => 1,
-                'server' => 'global',
-                'world' => 'global',
-                'expiry' => $expiry,
-                'contexts' => '{}',
-            ])
-            ->run();
-
-        // Update primary group
-        $db
-            ->update($prefix . 'players')
-            ->set('primary_group', strtolower(trim($group)))
-            ->where('uuid', $uuid)
-            ->run();
-
-        // Send sync command via RCON if possible
-        $this->sendRcon($server, 'lp sync');
-
-        return true;
+        return !$simulate;
     }
 
     protected function getUserMinecraftUuid(User $user): ?string

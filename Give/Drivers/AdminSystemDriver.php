@@ -45,6 +45,16 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
         return 'admin';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/Pisex/cs2-bans';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';
@@ -223,7 +233,7 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
                 ->fetchAll();
 
             if (empty($group)) {
-                throw new BadConfigurationException('group not found');
+                throw BadConfigurationException::noGroup();
             }
 
             $groupName = $group[0]['name'] ?? '';
@@ -232,7 +242,7 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
         $existingServerAssignment = null;
         if (!empty($existingAdmin)) {
             $admin = $existingAdmin[0];
-            if (!$ignoreErrors) {
+            if ($simulate && !$ignoreErrors) {
                 $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['name'],
                     ':group' => $groupName,
@@ -337,14 +347,12 @@ class AdminSystemDriver extends AbstractDriver implements CheckableInterface
     protected function validateAdditionalParams(array $additional, Server $server): array
     {
         if (empty($additional['group']) && empty($additional['flags'])) {
-            throw new BadConfigurationException('group or flags is required');
+            throw BadConfigurationException::noGroup($server->name);
         }
 
         $dbConnection = $server->getDbConnection('AdminSystem');
         if (!$dbConnection) {
-            throw new BadConfigurationException(
-                'db connection AdminSystem does not exist (server: ' . $server->name . ')',
-            );
+            throw BadConfigurationException::noDbConnection('AdminSystem', $server->name);
         }
 
         $serverId = isset($additional['sid']) ? (int) $additional['sid'] : (int) ( $server->id ?? 0 );

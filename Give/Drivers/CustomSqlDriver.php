@@ -91,9 +91,15 @@ class CustomSqlDriver extends AbstractDriver
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $sql = $this->config['sql_deliver'] ?? '';
         if (empty($sql)) {
-            throw new BadConfigurationException('sql_deliver', $server->name);
+            throw BadConfigurationException::noSql($server->name);
         }
 
         $modKey = $this->dbConnectionKey();
@@ -119,9 +125,11 @@ class CustomSqlDriver extends AbstractDriver
             $bindings[$bindName] = $value;
         }
 
-        $db->execute($sql, $bindings);
+        if (!$simulate) {
+            $db->execute($sql, $bindings);
+        }
 
-        return true;
+        return !$simulate;
     }
 
     protected function buildParams(User $user, array $additional, int $time, string $prefix): array

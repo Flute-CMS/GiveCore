@@ -10,23 +10,23 @@ use Flute\Modules\GiveCore\Exceptions\GiveDriverException;
 use Flute\Modules\GiveCore\Exceptions\UserSocialException;
 use Flute\Modules\GiveCore\Support\AbstractDriver;
 
-class AmxUnbanDriver extends AbstractDriver
+class FreshBansUnbanDriver extends AbstractDriver
 {
-    protected const MOD_KEY = 'Amx';
+    protected const MOD_KEY = 'FreshBans';
 
     public function alias(): string
     {
-        return 'amxunban';
+        return 'freshbans';
     }
 
     public function name(): string
     {
-        return __('givecore.drivers.amxunban.name');
+        return __('givecore.drivers.freshbans.name');
     }
 
     public function description(): string
     {
-        return __('givecore.drivers.amxunban.description');
+        return __('givecore.drivers.freshbans.description');
     }
 
     public function icon(): string
@@ -41,7 +41,7 @@ class AmxUnbanDriver extends AbstractDriver
 
     public function sourceUrl(): ?string
     {
-        return 'https://github.com/alliedmodders/amxmodx';
+        return 'https://dev-cs.ru/resources/freshbans.90/';
     }
 
     public function supportedGames(): array
@@ -82,7 +82,7 @@ class AmxUnbanDriver extends AbstractDriver
             throw new BadConfigurationException(static::MOD_KEY, $server->name);
         }
 
-        $prefix = $this->getPrefix($dbConnection->dbname, 'amx_');
+        $prefix = $this->getPrefix($dbConnection->dbname, 'freshbans_');
         $db = dbal()->database($dbConnection->dbname);
 
         $steamId2 = steam()->steamid($steam->value)->RenderSteam2();
@@ -106,7 +106,7 @@ class AmxUnbanDriver extends AbstractDriver
 
         if (empty($activeBans)) {
             if (!$ignoreErrors) {
-                throw new GiveDriverException(__('givecore.drivers.amxunban.no_active_ban'));
+                throw new GiveDriverException(__('givecore.drivers.freshbans.no_active_ban'));
             }
 
             return false;
@@ -115,26 +115,19 @@ class AmxUnbanDriver extends AbstractDriver
         if (!$simulate) {
             foreach ($activeBans as $ban) {
                 $db->update($prefix . 'bans', ['expired' => 1])
-                    ->where('bid', $ban['bid'])
+                    ->where('id', $ban['id'])
                     ->run();
             }
 
-            $this->sendRcon($server, 'amx_reloadadmins');
+            try {
+                $rconService = app(RconService::class);
+                if ($rconService->isAvailable($server)) {
+                    $rconService->execute($server, 'amx_reloadadmins');
+                }
+            } catch (\Throwable $e) {
+            }
         }
 
         return !$simulate;
-    }
-
-    protected function sendRcon(Server $server, string $command): void
-    {
-        try {
-            $rconService = app(RconService::class);
-
-            if ($rconService->isAvailable($server)) {
-                $rconService->execute($server, $command);
-            }
-        } catch (\Throwable $e) {
-            // RCON is optional
-        }
     }
 }

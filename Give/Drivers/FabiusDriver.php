@@ -48,6 +48,16 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
         return 'vip';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/partiusfabaa/cs2-LiteVIP';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';
@@ -184,10 +194,13 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
             ->andWhere('sid', '=', $sid)
             ->fetchAll();
 
-        if (!empty($dbusers)) {
+        $hasActiveRecord = !empty($dbusers)
+            && ((int) $dbusers[0]['expires'] === 0 || (int) $dbusers[0]['expires'] >= time());
+
+        if (!empty($dbusers) && $hasActiveRecord) {
             $dbuser = $dbusers[0];
 
-            if (!$ignoreErrors) {
+            if ($simulate && !$ignoreErrors) {
                 if (strtolower(trim($dbuser['group'])) === strtolower(trim($group))) {
                     $this->confirm(__('givecore.add_time', [
                         ':server' => $server->name,
@@ -209,6 +222,10 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
 
             if (!$simulate) {
                 $this->updateOrInsertUser($db, $accountId, $sid, $group, $time, $user, $dbuser);
+            }
+        } else if (!empty($dbusers)) {
+            if (!$simulate) {
+                $this->updateOrInsertUser($db, $accountId, $sid, $group, $time, $user, $dbusers[0]);
             }
         } else {
             if (!$simulate) {
@@ -250,14 +267,12 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
     private function validateAdditionalParams(array $additional, Server $server): array
     {
         if (empty($additional['group'])) {
-            throw new BadConfigurationException('group in configuration is required');
+            throw BadConfigurationException::noGroup($server->name);
         }
 
         $dbConnection = $server->getDbConnection('FabiusVIP');
         if (!$dbConnection) {
-            throw new BadConfigurationException(
-                'db connection FabiusVIP is not exists (server: ' . $server->name . ')',
-            );
+            throw BadConfigurationException::noDbConnection('FabiusVIP', $server->name);
         }
 
         $prefix = $this->getPrefix($dbConnection->dbname, 'vip_');
@@ -270,7 +285,7 @@ class FabiusDriver extends AbstractDriver implements CheckableInterface
             ->fetchAll();
 
         if (empty($findServer)) {
-            throw new BadConfigurationException('server not found');
+            throw BadConfigurationException::noDbConnection('FabiusVIP', $server->name);
         }
 
         $findServer = $findServer[0];

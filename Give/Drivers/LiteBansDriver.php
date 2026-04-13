@@ -38,6 +38,16 @@ class LiteBansDriver extends AbstractDriver
         return 'Minecraft';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://www.spigotmc.org/resources/litebans.3715/';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['Minecraft'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Minecraft';
@@ -65,6 +75,12 @@ class LiteBansDriver extends AbstractDriver
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $uuid = $this->getUserMinecraftUuid($user);
         if (!$uuid) {
             throw new UserSocialException('Minecraft');
@@ -103,18 +119,20 @@ class LiteBansDriver extends AbstractDriver
             return false;
         }
 
-        foreach ($activePunishments as $punishment) {
-            $db->update($prefix . $table)
-                ->set('active', 0)
-                ->set('removed_by_uuid', '#console')
-                ->set('removed_by_name', 'Web GiveCore')
-                ->set('removed_by_reason', 'Removed via GiveCore')
-                ->set('removed_by_date', $now)
-                ->where('id', $punishment['id'])
-                ->run();
+        if (!$simulate) {
+            foreach ($activePunishments as $punishment) {
+                $db->update($prefix . $table)
+                    ->set('active', 0)
+                    ->set('removed_by_uuid', '#console')
+                    ->set('removed_by_name', 'Web GiveCore')
+                    ->set('removed_by_reason', 'Removed via GiveCore')
+                    ->set('removed_by_date', $now)
+                    ->where('id', $punishment['id'])
+                    ->run();
+            }
         }
 
-        return true;
+        return !$simulate;
     }
 
     protected function getUserMinecraftUuid(User $user): ?string

@@ -7,6 +7,18 @@ return [
 
     'no_servers' => 'Нет серверов с подключением :key',
 
+    'errors' => [
+        'no_db_connection' => 'На сервере «:server» не настроено подключение к базе :mod. Обратитесь к администратору',
+        'no_group' => 'Не указана группа или флаги для выдачи привилегии. Обратитесь к администратору',
+        'no_rcon' => 'На сервере «:server» не настроен RCON. Обратитесь к администратору',
+        'no_command' => 'Не задана RCON-команда для этого товара. Обратитесь к администратору',
+        'social_required' => 'Необходимо привязать :social к аккаунту',
+        'driver_not_found' => 'Драйвер выдачи «:driver» не найден. Обратитесь к администратору',
+        'missing_param' => 'Не указан параметр «:param» для сервера «:server». Обратитесь к администратору',
+        'no_sql' => 'Не задан SQL-запрос для этого товара. Обратитесь к администратору',
+        'rcon_failed' => 'Не удалось выполнить команду на сервере. Попробуйте позже или обратитесь к администратору',
+    ],
+
     'drivers' => [
         // Delivery drivers
         'vip' => [
@@ -21,9 +33,26 @@ return [
             'name' => 'AdminSystem',
             'description' => 'Выдача/проверка админ-привилегий через AdminSystem (MateSystem)',
         ],
+        'iks' => [
+            'name' => 'IKS Admin',
+            'description' => 'Выдача/проверка админ-привилегий через IKS Admin',
+        ],
+        'simpleadmin' => [
+            'name' => 'SimpleAdmin',
+            'description' => 'Выдача/проверка админ-привилегий через CS2-SimpleAdmin',
+        ],
         'sourcebans' => [
             'name' => 'SourceBans',
             'description' => 'Выдача/проверка админ-привилегий через SourceBans/SourceBans++',
+        ],
+        'freshbans' => [
+            'name' => 'Fresh Bans',
+            'description' => 'Разбан через Fresh Bans (CS 1.6)',
+            'no_active_ban' => 'Активных банов не найдено',
+        ],
+        'freshbans_admin' => [
+            'name' => 'Fresh Bans Admin',
+            'description' => 'Выдача админ-привилегий через Fresh Bans (CS 1.6)',
         ],
         'rcon' => [
             'name' => 'RCON',
@@ -218,11 +247,6 @@ return [
             'description' => 'Проверка статистики в K4-System (CS2)',
             'no_servers' => 'Нет серверов с подключением K4',
         ],
-        'k4system' => [
-            'name' => 'K4-System',
-            'description' => 'Проверка статистики в K4-System (CS2)',
-            'no_servers' => 'Нет серверов с подключением K4',
-        ],
     ],
 
     'fields' => [
@@ -242,6 +266,10 @@ return [
         'sb_flags_help' => 'Флаги доступа (например: abcdefghijklmnopqrstz). Можно не указывать, если выдаёте группу',
         'as_group_help' => 'ID группы AdminSystem. Можно не указывать, если выдаёте только флаги',
         'as_flags_help' => 'Флаги доступа. Можно не указывать, если выдаёте группу',
+        'iks_group_help' => 'Название группы IKS Admin. Можно не указывать, если выдаёте только флаги',
+        'iks_flags_help' => 'Флаги доступа. Можно не указывать, если выдаёте группу',
+        'sa_group_help' => 'Название группы SimpleAdmin. Можно не указывать, если выдаёте только флаги',
+        'sa_flags_help' => 'Флаги доступа. Можно не указывать, если выдаёте группу',
         'comment' => 'Комментарий',
         'password' => 'Пароль',
         'password_placeholder' => 'Будет сгенерирован автоматически',
@@ -252,6 +280,7 @@ return [
         'amx_bind_type' => 'Тип привязки',
         'amx_bind_type_help' => 'Способ авторизации админа на сервере. «Выбор при покупке» позволяет покупателю самому выбрать',
         'amx_bind_steamid' => 'STEAM ID',
+        'amx_bind_steamid_manual' => 'STEAM ID (ручной ввод)',
         'amx_bind_nick_password' => 'Ник + пароль',
         'amx_bind_steamid_password' => 'STEAM ID + пароль',
         'amx_bind_ip' => 'IP',
@@ -264,6 +293,12 @@ return [
         'amx_password' => 'Пароль',
         'amx_password_placeholder' => 'Пароль для входа на сервер',
         'amx_password_required' => 'Необходимо указать пароль для привязки',
+        'amx_steamid' => 'Steam ID',
+        'amx_steamid_placeholder' => 'STEAM_0:X:XXXXXXX',
+        'amx_steamid_required' => 'Необходимо указать Steam ID',
+        'amx_steamid_invalid' => 'Некорректный формат Steam ID',
+        'amx_steamid_helper' => 'Введите Steam ID в формате STEAM_0:X:XXXXXXX. Узнать можно командой status в консоли игры',
+        'amx_steamid_autofill' => 'Заполнено автоматически из привязанного Steam аккаунта',
         'amx_ip' => 'IP адрес',
         'amx_ip_placeholder' => 'Ваш IP адрес (например: 123.45.67.89)',
         'amx_ip_required' => 'Необходимо указать корректный IP адрес',
@@ -272,6 +307,7 @@ return [
         'amx_ip_helper' => 'IP, с которого вы подключаетесь к серверу',
         'amx_bind_nick_password_desc' => 'Авторизация по нику с паролем',
         'amx_bind_steamid_desc' => 'Автоматически по Steam аккаунту',
+        'amx_bind_steamid_manual_desc' => 'Ввести Steam ID вручную без привязки аккаунта',
         'amx_bind_steamid_password_desc' => 'Steam + дополнительный пароль',
         'amx_bind_ip_desc' => 'Привязка к вашему IP адресу',
         'amx_bind_ip_password_desc' => 'IP + дополнительный пароль',
@@ -282,6 +318,10 @@ return [
         'command' => 'RCON команда',
         'command_placeholder' => 'Введите команду',
         'command_help' => 'Плейсхолдеры: {steam32}, {steam64}, {accountId}, {login}, {name}, {email}, {uri}, {days}, {hours}, {minutes}, {seconds}, {unix}, {nickname}',
+        'rcon_steam_input' => 'Ввод Steam ID',
+        'rcon_steam_input_auto' => 'Автоматически (из привязки)',
+        'rcon_steam_input_manual' => 'Ручной ввод',
+        'rcon_steam_input_help' => 'Как получать Steam ID: автоматически из привязанного аккаунта или ручной ввод покупателем',
         'check_type' => 'Тип проверки',
         'has_ban' => 'Есть бан',
         'no_ban' => 'Нет бана',
@@ -374,7 +414,6 @@ return [
         'alias_help' => 'Уникальный идентификатор (латиница, цифры, _)',
         'name' => 'Название',
         'name_help' => 'Отображаемое имя в интерфейсе',
-        'description' => 'Описание',
         'icon' => 'Иконка',
         'icon_help' => 'Phosphor Icons (например: ph.bold.plug-bold)',
         'category' => 'Категория',

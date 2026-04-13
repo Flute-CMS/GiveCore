@@ -49,6 +49,16 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
         return 'admin';
     }
 
+    public function sourceUrl(): ?string
+    {
+        return 'https://github.com/sbpp/sourcebans-pp';
+    }
+
+    public function supportedGames(): array
+    {
+        return ['CS2', 'CS:GO', 'CS:S', 'TF2', 'Garry\'s Mod'];
+    }
+
     public function requiredSocial(array $config = []): ?string
     {
         return 'Steam';
@@ -212,7 +222,7 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
 
         if (!empty($existingAdmin)) {
             $admin = $existingAdmin[0];
-            if (!$ignoreErrors) {
+            if ($simulate && !$ignoreErrors) {
                 $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['user'],
                     ':group' => $groupName ?: $flags,
@@ -360,13 +370,13 @@ class SourceBansDriver extends AbstractDriver implements CheckableInterface
     protected function validateAdditionalParams(array $additional, Server $server): array
     {
         if (empty($additional['group']) && empty($additional['flags'])) {
-            throw new BadConfigurationException('group or flags is required');
+            throw BadConfigurationException::noGroup();
         }
 
         $dbConnection = $server->getDbConnection('SourceBans');
 
         if (!$dbConnection) {
-            throw new BadConfigurationException('db connection SourceBans is not exists');
+            throw BadConfigurationException::noDbConnection('SourceBans', $server->name);
         }
 
         return [$dbConnection, 0];

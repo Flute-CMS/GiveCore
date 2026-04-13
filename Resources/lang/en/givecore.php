@@ -7,6 +7,18 @@ return [
 
     'no_servers' => 'No servers with :key connection',
 
+    'errors' => [
+        'no_db_connection' => 'Server ":server" has no :mod database connection configured. Please contact the administrator',
+        'no_group' => 'No group or flags specified for privilege delivery. Please contact the administrator',
+        'no_rcon' => 'Server ":server" has no RCON configured. Please contact the administrator',
+        'no_command' => 'No RCON command configured for this product. Please contact the administrator',
+        'social_required' => 'You need to link :social to your account',
+        'driver_not_found' => 'Delivery driver ":driver" not found. Please contact the administrator',
+        'missing_param' => 'Parameter ":param" is not configured for server ":server". Please contact the administrator',
+        'no_sql' => 'No SQL query configured for this product. Please contact the administrator',
+        'rcon_failed' => 'Failed to execute command on the server. Please try again later or contact the administrator',
+    ],
+
     'drivers' => [
         'vip' => [
             'name' => 'VIP Core',
@@ -20,9 +32,26 @@ return [
             'name' => 'AdminSystem',
             'description' => 'Grant/check admin privileges via AdminSystem (MateSystem)',
         ],
+        'iks' => [
+            'name' => 'IKS Admin',
+            'description' => 'Grant/check admin privileges via IKS Admin',
+        ],
+        'simpleadmin' => [
+            'name' => 'SimpleAdmin',
+            'description' => 'Grant/check admin privileges via CS2-SimpleAdmin',
+        ],
         'sourcebans' => [
             'name' => 'SourceBans',
             'description' => 'Grant/check admin privileges via SourceBans/SourceBans++',
+        ],
+        'freshbans' => [
+            'name' => 'Fresh Bans',
+            'description' => 'Unban player via Fresh Bans (CS 1.6)',
+            'no_active_ban' => 'No active bans found for this player',
+        ],
+        'freshbans_admin' => [
+            'name' => 'Fresh Bans Admin',
+            'description' => 'Deliver admin privileges via Fresh Bans (CS 1.6)',
         ],
         'rcon' => [
             'name' => 'RCON',
@@ -210,11 +239,6 @@ return [
             'description' => 'Check statistics in K4-System (CS2)',
             'no_servers' => 'No servers with K4 connection',
         ],
-        'k4system' => [
-            'name' => 'K4-System',
-            'description' => 'Check statistics in K4-System (CS2)',
-            'no_servers' => 'No servers with K4 connection',
-        ],
     ],
 
     'fields' => [
@@ -234,6 +258,10 @@ return [
         'sb_flags_help' => 'Access flags (e.g.: abcdefghijklmnopqrstz). Optional if delivering a group',
         'as_group_help' => 'AdminSystem group ID. Optional if delivering flags only',
         'as_flags_help' => 'Access flags. Optional if delivering a group',
+        'iks_group_help' => 'IKS Admin group name. Optional if delivering flags only',
+        'iks_flags_help' => 'Access flags. Optional if delivering a group',
+        'sa_group_help' => 'SimpleAdmin group name. Optional if delivering flags only',
+        'sa_flags_help' => 'Access flags. Optional if delivering a group',
         'comment' => 'Comment',
         'password' => 'Password',
         'password_placeholder' => 'Will be auto-generated',
@@ -246,6 +274,7 @@ return [
         'amx_bind_steamid' => 'STEAM ID',
         'amx_bind_nick_password' => 'Nick + password',
         'amx_bind_steamid_password' => 'STEAM ID + password',
+        'amx_bind_steamid_manual' => 'STEAM ID (manual input)',
         'amx_bind_ip' => 'IP',
         'amx_bind_ip_password' => 'IP + password',
         'amx_bind_choice' => 'Choice at purchase',
@@ -256,6 +285,12 @@ return [
         'amx_password' => 'Password',
         'amx_password_placeholder' => 'Server login password',
         'amx_password_required' => 'Password is required for this bind type',
+        'amx_steamid' => 'Steam ID',
+        'amx_steamid_placeholder' => 'STEAM_0:X:XXXXXXX',
+        'amx_steamid_required' => 'Steam ID is required',
+        'amx_steamid_invalid' => 'Invalid Steam ID format',
+        'amx_steamid_helper' => 'Enter Steam ID in STEAM_0:X:XXXXXXX format. Use the status command in game console to find it',
+        'amx_steamid_autofill' => 'Auto-filled from your linked Steam account',
         'amx_ip' => 'IP address',
         'amx_ip_placeholder' => 'Your IP address (e.g. 123.45.67.89)',
         'amx_ip_required' => 'A valid IP address is required',
@@ -264,6 +299,7 @@ return [
         'amx_ip_helper' => 'The IP address you connect to the server from',
         'amx_bind_nick_password_desc' => 'Auth by nickname with password',
         'amx_bind_steamid_desc' => 'Automatic via Steam account',
+        'amx_bind_steamid_manual_desc' => 'Enter Steam ID manually without linking account',
         'amx_bind_steamid_password_desc' => 'Steam + additional password',
         'amx_bind_ip_desc' => 'Bind to your IP address',
         'amx_bind_ip_password_desc' => 'IP + additional password',
@@ -274,6 +310,10 @@ return [
         'command' => 'RCON Command',
         'command_placeholder' => 'Enter command',
         'command_help' => 'Placeholders: {steam32}, {steam64}, {accountId}, {login}, {name}, {email}, {uri}, {days}, {hours}, {minutes}, {seconds}, {unix}, {nickname}',
+        'rcon_steam_input' => 'Steam ID Input',
+        'rcon_steam_input_auto' => 'Automatic (from linked account)',
+        'rcon_steam_input_manual' => 'Manual input',
+        'rcon_steam_input_help' => 'How to get Steam ID: automatically from linked account or manual input by the buyer',
         'check_type' => 'Check Type',
         'has_ban' => 'Has ban',
         'no_ban' => 'No ban',
@@ -363,7 +403,6 @@ return [
         'alias_help' => 'Unique identifier (lowercase letters, digits, _)',
         'name' => 'Name',
         'name_help' => 'Display name in the interface',
-        'description' => 'Description',
         'icon' => 'Icon',
         'icon_help' => 'Phosphor Icons (e.g.: ph.bold.plug-bold)',
         'category' => 'Category',

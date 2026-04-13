@@ -123,6 +123,16 @@ abstract class AbstractDriver implements DriverInterface
         return __('givecore.no_servers', ['key' => $this->dbConnectionKey() ?? '']);
     }
 
+    public function sourceUrl(): ?string
+    {
+        return null;
+    }
+
+    public function supportedGames(): array
+    {
+        return [];
+    }
+
     /**
      * Required social network alias for delivery (e.g. 'Steam', 'Minecraft'),
      * or null if delivery does not require any social linkage.

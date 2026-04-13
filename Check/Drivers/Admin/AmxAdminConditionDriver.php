@@ -10,7 +10,7 @@ use Throwable;
 
 class AmxAdminConditionDriver extends AbstractCheckDriver
 {
-    protected const MOD_KEY = 'AmxBans';
+    protected const MOD_KEY = 'Amx';
 
     public function alias(): string
     {
