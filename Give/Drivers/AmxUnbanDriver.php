@@ -12,7 +12,7 @@ use Flute\Modules\GiveCore\Support\AbstractDriver;
 
 class AmxUnbanDriver extends AbstractDriver
 {
-    protected const MOD_KEY = 'AmxModX';
+    protected const MOD_KEY = 'Amx';
 
     public function alias(): string
     {
@@ -66,6 +66,12 @@ class AmxUnbanDriver extends AbstractDriver
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
         if (!$steam?->value) {
             throw new UserSocialException('Steam');
@@ -106,15 +112,17 @@ class AmxUnbanDriver extends AbstractDriver
             return false;
         }
 
-        foreach ($activeBans as $ban) {
-            $db->update($prefix . 'bans', ['expired' => 1])
-                ->where('bid', $ban['bid'])
-                ->run();
+        if (!$simulate) {
+            foreach ($activeBans as $ban) {
+                $db->update($prefix . 'bans', ['expired' => 1])
+                    ->where('bid', $ban['bid'])
+                    ->run();
+            }
+
+            $this->sendRcon($server, 'amx_reloadadmins');
         }
 
-        $this->sendRcon($server, 'amx_reloadadmins');
-
-        return true;
+        return !$simulate;
     }
 
     protected function sendRcon(Server $server, string $command): void

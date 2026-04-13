@@ -73,6 +73,12 @@ class K4SystemDriver extends AbstractDriver
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $steamId = $this->getUserSteamId($user);
         if (!$steamId) {
             throw new UserSocialException('Steam');
@@ -85,7 +91,7 @@ class K4SystemDriver extends AbstractDriver
 
         $points = (int) ($additional['points'] ?? 0);
         if ($points <= 0) {
-            throw new BadConfigurationException('points', $server->name);
+            throw BadConfigurationException::missingParam('points', $server->name);
         }
 
         $connAdditional = Json::decode($dbConnection->additional, true);
@@ -102,24 +108,26 @@ class K4SystemDriver extends AbstractDriver
             ->where('steam_id', $steamId64)
             ->fetchAll();
 
-        if (empty($existing)) {
-            $db->insert($prefix . $ranksTable)
-                ->values([
-                    'steam_id' => $steamId64,
-                    'name' => $user->name ?? 'Player',
-                    'rank' => 'default',
-                    'points' => $points,
-                ])
-                ->run();
-        } else {
-            $currentPoints = (int) $existing[0]['points'];
+        if (!$simulate) {
+            if (empty($existing)) {
+                $db->insert($prefix . $ranksTable)
+                    ->values([
+                        'steam_id' => $steamId64,
+                        'name' => $user->name ?? 'Player',
+                        'rank' => 'default',
+                        'points' => $points,
+                    ])
+                    ->run();
+            } else {
+                $currentPoints = (int) $existing[0]['points'];
 
-            $db->update($prefix . $ranksTable)
-                ->set('points', $currentPoints + $points)
-                ->where('steam_id', $steamId64)
-                ->run();
+                $db->update($prefix . $ranksTable)
+                    ->set('points', $currentPoints + $points)
+                    ->where('steam_id', $steamId64)
+                    ->run();
+            }
         }
 
-        return true;
+        return !$simulate;
     }
 }

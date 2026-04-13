@@ -199,13 +199,17 @@ class SimpleAdminDriver extends AbstractDriver implements CheckableInterface
 
         $dbConnection = $server->getDbConnection(static::MOD_KEY);
         if (!$dbConnection) {
-            throw new BadConfigurationException(
-                'db connection SimpleAdmin does not exist (server: ' . $server->name . ')',
-            );
+            throw BadConfigurationException::noDbConnection('SimpleAdmin', $server->name);
         }
 
         if (empty($additional['group']) && empty($additional['flags'])) {
-            throw new BadConfigurationException('group or flags is required');
+            throw BadConfigurationException::noGroup($server->name);
+        }
+
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
         }
 
         $this->prefix = $this->getPrefix($dbConnection->dbname, 'sa_');
@@ -243,57 +247,61 @@ class SimpleAdminDriver extends AbstractDriver implements CheckableInterface
                 $ends = date('Y-m-d H:i:s', $base + $time);
             }
 
-            if (!$ignoreErrors) {
+            if ($simulate && !$ignoreErrors) {
                 $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['player_name'] ?? $user->name,
                     ':group' => $groupName,
                 ]));
             }
 
-            $updateData = [
-                'immunity' => $immunity,
-                'ends' => $ends,
-            ];
-            if (!empty($flags)) {
-                $updateData['flags'] = $flags;
-            }
-            if (!empty($groupName)) {
-                $updateData['group_name'] = $groupName;
-            }
-
-            $db
-                ->update($this->prefix . 'admins', $updateData)
-                ->where('player_steamid', $steamId64)
-                ->where('server_id', $serverId)
-                ->run();
-        } else {
-            $adminFlags = $flags;
-            if (empty($adminFlags) && !empty($groupName)) {
-                $groups = $db
-                    ->select()
-                    ->from($this->prefix . 'admins_groups')
-                    ->where('name', $groupName)
-                    ->fetchAll();
-
-                if (!empty($groups)) {
-                    $adminFlags = '#' . $groups[0]['id'];
-                }
-            }
-
-            $db
-                ->insert($this->prefix . 'admins')
-                ->values([
-                    'player_steamid' => $steamId64,
-                    'player_name' => $user->name,
-                    'flags' => $adminFlags,
+            if (!$simulate) {
+                $updateData = [
                     'immunity' => $immunity,
-                    'server_id' => $serverId,
                     'ends' => $ends,
-                    'created' => $now,
-                ])
-                ->run();
+                ];
+                if (!empty($flags)) {
+                    $updateData['flags'] = $flags;
+                }
+                if (!empty($groupName)) {
+                    $updateData['group_name'] = $groupName;
+                }
+
+                $db
+                    ->update($this->prefix . 'admins', $updateData)
+                    ->where('player_steamid', $steamId64)
+                    ->where('server_id', $serverId)
+                    ->run();
+            }
+        } else {
+            if (!$simulate) {
+                $adminFlags = $flags;
+                if (empty($adminFlags) && !empty($groupName)) {
+                    $groups = $db
+                        ->select()
+                        ->from($this->prefix . 'admins_groups')
+                        ->where('name', $groupName)
+                        ->fetchAll();
+
+                    if (!empty($groups)) {
+                        $adminFlags = '#' . $groups[0]['id'];
+                    }
+                }
+
+                $db
+                    ->insert($this->prefix . 'admins')
+                    ->values([
+                        'player_steamid' => $steamId64,
+                        'player_name' => $user->name,
+                        'flags' => $adminFlags,
+                        'immunity' => $immunity,
+                        'server_id' => $serverId,
+                        'ends' => $ends,
+                        'created' => $now,
+                    ])
+                    ->run();
+            }
         }
 
-        return true;
+        return !$simulate;
     }
 }

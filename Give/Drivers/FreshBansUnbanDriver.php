@@ -66,6 +66,12 @@ class FreshBansUnbanDriver extends AbstractDriver
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
         if (!$steam?->value) {
             throw new UserSocialException('Steam');
@@ -106,20 +112,22 @@ class FreshBansUnbanDriver extends AbstractDriver
             return false;
         }
 
-        foreach ($activeBans as $ban) {
-            $db->update($prefix . 'bans', ['expired' => 1])
-                ->where('id', $ban['id'])
-                ->run();
-        }
-
-        try {
-            $rconService = app(RconService::class);
-            if ($rconService->isAvailable($server)) {
-                $rconService->execute($server, 'amx_reloadadmins');
+        if (!$simulate) {
+            foreach ($activeBans as $ban) {
+                $db->update($prefix . 'bans', ['expired' => 1])
+                    ->where('id', $ban['id'])
+                    ->run();
             }
-        } catch (\Throwable $e) {
+
+            try {
+                $rconService = app(RconService::class);
+                if ($rconService->isAvailable($server)) {
+                    $rconService->execute($server, 'amx_reloadadmins');
+                }
+            } catch (\Throwable $e) {
+            }
         }
 
-        return true;
+        return !$simulate;
     }
 }

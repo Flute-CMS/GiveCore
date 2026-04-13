@@ -17,9 +17,10 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
 {
     use CheckableTrait;
 
-    protected const MOD_KEY = 'AmxModX';
+    protected const MOD_KEY = 'Amx';
 
     public const BIND_STEAMID = 'steamid';
+    public const BIND_STEAMID_MANUAL = 'steamid_manual';
     public const BIND_NICK_PASSWORD = 'nick_password';
     public const BIND_STEAMID_PASSWORD = 'steamid_password';
     public const BIND_IP = 'ip';
@@ -27,6 +28,7 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
 
     protected const AUTH_FLAGS = [
         self::BIND_STEAMID => 'ce',
+        self::BIND_STEAMID_MANUAL => 'ce',
         self::BIND_NICK_PASSWORD => 'a',
         self::BIND_STEAMID_PASSWORD => 'c',
         self::BIND_IP => 'de',
@@ -35,6 +37,7 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
 
     protected const ALL_BIND_TYPES = [
         self::BIND_STEAMID,
+        self::BIND_STEAMID_MANUAL,
         self::BIND_NICK_PASSWORD,
         self::BIND_STEAMID_PASSWORD,
         self::BIND_IP,
@@ -80,17 +83,19 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
     {
         $bindType = $config['bind_type'] ?? self::BIND_STEAMID;
 
+        $noOAuthTypes = [self::BIND_STEAMID_MANUAL, self::BIND_NICK_PASSWORD, self::BIND_IP, self::BIND_IP_PASSWORD];
+
         if ($bindType === 'choice') {
             $chosen = $config['amx_bind_type'] ?? null;
 
-            if (in_array($chosen, [self::BIND_NICK_PASSWORD, self::BIND_IP, self::BIND_IP_PASSWORD], true)) {
+            if (in_array($chosen, $noOAuthTypes, true)) {
                 return null;
             }
 
             return 'Steam';
         }
 
-        if (in_array($bindType, [self::BIND_NICK_PASSWORD, self::BIND_IP, self::BIND_IP_PASSWORD], true)) {
+        if (in_array($bindType, $noOAuthTypes, true)) {
             return null;
         }
 
@@ -121,6 +126,7 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
                 'default' => self::BIND_STEAMID,
                 'options' => [
                     self::BIND_STEAMID => __('givecore.fields.amx_bind_steamid'),
+                    self::BIND_STEAMID_MANUAL => __('givecore.fields.amx_bind_steamid_manual'),
                     self::BIND_NICK_PASSWORD => __('givecore.fields.amx_bind_nick_password'),
                     self::BIND_STEAMID_PASSWORD => __('givecore.fields.amx_bind_steamid_password'),
                     self::BIND_IP => __('givecore.fields.amx_bind_ip'),
@@ -142,6 +148,7 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
 
         $fields = [];
         $isChoice = $bindType === 'choice';
+        $needsManualSteam = in_array($bindType, [self::BIND_STEAMID_MANUAL, 'choice'], true);
         $needsNick = in_array($bindType, [self::BIND_NICK_PASSWORD, 'choice'], true);
         $needsPassword = in_array($bindType, [self::BIND_NICK_PASSWORD, self::BIND_STEAMID_PASSWORD, self::BIND_IP_PASSWORD, 'choice'], true);
         $needsIp = in_array($bindType, [self::BIND_IP, self::BIND_IP_PASSWORD, 'choice'], true);
@@ -154,11 +161,22 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
                 'options' => [
                     self::BIND_NICK_PASSWORD => __('givecore.fields.amx_bind_nick_password'),
                     self::BIND_STEAMID => __('givecore.fields.amx_bind_steamid'),
+                    self::BIND_STEAMID_MANUAL => __('givecore.fields.amx_bind_steamid_manual'),
                     self::BIND_STEAMID_PASSWORD => __('givecore.fields.amx_bind_steamid_password'),
                     self::BIND_IP => __('givecore.fields.amx_bind_ip'),
                     self::BIND_IP_PASSWORD => __('givecore.fields.amx_bind_ip_password'),
                 ],
                 'default' => self::BIND_NICK_PASSWORD,
+            ];
+        }
+
+        if ($needsManualSteam) {
+            $fields['amx_steamid'] = [
+                'type' => 'text',
+                'label' => __('givecore.fields.amx_steamid'),
+                'required' => false,
+                'placeholder' => __('givecore.fields.amx_steamid_placeholder'),
+                'show_when' => $isChoice ? ['amx_bind_type' => self::BIND_STEAMID_MANUAL] : null,
             ];
         }
 
@@ -293,11 +311,17 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $bindType = $this->resolveBindType($additional);
-        $needsSteam = in_array($bindType, [self::BIND_STEAMID, self::BIND_STEAMID_PASSWORD], true);
+        $needsOAuthSteam = in_array($bindType, [self::BIND_STEAMID, self::BIND_STEAMID_PASSWORD], true);
         $needsIp = in_array($bindType, [self::BIND_IP, self::BIND_IP_PASSWORD], true);
 
-        if ($needsSteam) {
+        if ($needsOAuthSteam) {
             $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
             if (!$steam?->value) {
                 throw new UserSocialException('Steam');
@@ -348,12 +372,14 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
                         $updateData['password'] = $password;
                     }
 
-                    $db
-                        ->update($prefix . 'amxadmins', $updateData)
-                        ->where('id', $record['id'])
-                        ->run();
+                    if (!$simulate) {
+                        $db
+                            ->update($prefix . 'amxadmins', $updateData)
+                            ->where('id', $record['id'])
+                            ->run();
+                    }
 
-                    return true;
+                    return !$simulate;
                 }
             }
 
@@ -370,60 +396,64 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
                 $updateData['password'] = $password;
             }
 
+            if (!$simulate) {
+                $db
+                    ->update($prefix . 'amxadmins', $updateData)
+                    ->where('id', $record['id'])
+                    ->run();
+            }
+
+            return !$simulate;
+        }
+
+        if (!$simulate) {
             $db
-                ->update($prefix . 'amxadmins', $updateData)
-                ->where('id', $record['id'])
+                ->insert($prefix . 'amxadmins')
+                ->values([
+                    'username' => $nickname,
+                    'password' => $password,
+                    'access' => $access,
+                    'flags' => $authFlags,
+                    'steamid' => $authIdentifier,
+                    'nickname' => $nickname,
+                    'ashow' => 1,
+                    'created' => time(),
+                    'expired' => $expiry,
+                    'days' => $days,
+                ])
                 ->run();
 
-            return true;
-        }
+            $dbParams = Json::decode($dbConnection->additional ?? '{}');
+            $serverId = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
 
-        $db
-            ->insert($prefix . 'amxadmins')
-            ->values([
-                'username' => $nickname,
-                'password' => $password,
-                'access' => $access,
-                'flags' => $authFlags,
-                'steamid' => $authIdentifier,
-                'nickname' => $nickname,
-                'ashow' => 1,
-                'created' => time(),
-                'expired' => $expiry,
-                'days' => $days,
-            ])
-            ->run();
+            if ($serverId > 0) {
+                try {
+                    $adminId = $db
+                        ->select('MAX(id) as id')
+                        ->from($prefix . 'amxadmins')
+                        ->where('steamid', $authIdentifier)
+                        ->fetchAll();
 
-        $dbParams = Json::decode($dbConnection->additional ?? '{}');
-        $serverId = (int) ($dbParams->sid ?? $dbParams->server_id ?? 0);
-
-        if ($serverId > 0) {
-            try {
-                $adminId = $db
-                    ->select('MAX(id) as id')
-                    ->from($prefix . 'amxadmins')
-                    ->where('steamid', $authIdentifier)
-                    ->fetchAll();
-
-                if (!empty($adminId)) {
-                    $db
-                        ->insert($prefix . 'admins_servers')
-                        ->values([
-                            'admin_id' => $adminId[0]['id'],
-                            'server_id' => $serverId,
-                            'custom_flags' => '',
-                            'use_static_bantime' => 'yes',
-                        ])
-                        ->run();
+                    if (!empty($adminId)) {
+                        $db
+                            ->insert($prefix . 'admins_servers')
+                            ->values([
+                                'admin_id' => $adminId[0]['id'],
+                                'server_id' => $serverId,
+                                'custom_flags' => '',
+                                'use_static_bantime' => 'yes',
+                            ])
+                            ->run();
+                    }
+                } catch (\Throwable $e) {
+                    // admins_servers table may not exist in simpler setups
                 }
-            } catch (\Throwable $e) {
-                // admins_servers table may not exist in simpler setups
             }
+
+            $this->sendRcon($server, 'amx_reloadadmins');
         }
 
-        $this->sendRcon($server, 'amx_reloadadmins');
-
-        return true;
+        return !$simulate;
     }
 
     protected function resolveBindType(array $additional): string
@@ -459,6 +489,20 @@ class AmxModDriver extends AbstractDriver implements CheckableInterface
             }
 
             return $ip;
+        }
+
+        if ($bindType === self::BIND_STEAMID_MANUAL) {
+            $rawSteamId = trim($additional['amx_steamid'] ?? '');
+
+            if ($rawSteamId === '') {
+                throw new RuntimeException(__('givecore.fields.amx_steamid_required'));
+            }
+
+            try {
+                return steam()->steamid($rawSteamId)->RenderSteam2();
+            } catch (\Throwable) {
+                throw new RuntimeException(__('givecore.fields.amx_steamid_invalid'));
+            }
         }
 
         $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');

@@ -183,13 +183,17 @@ class IKSAdminDriver extends AbstractDriver implements CheckableInterface
 
         $dbConnection = $server->getDbConnection(static::MOD_KEY);
         if (!$dbConnection) {
-            throw new BadConfigurationException(
-                'db connection IKS does not exist (server: ' . $server->name . ')',
-            );
+            throw BadConfigurationException::noDbConnection('IKS', $server->name);
         }
 
         if (empty($additional['group']) && empty($additional['flags'])) {
-            throw new BadConfigurationException('group or flags is required');
+            throw BadConfigurationException::noGroup($server->name);
+        }
+
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
         }
 
         $this->prefix = $this->getPrefix($dbConnection->dbname, 'iks_');
@@ -220,44 +224,48 @@ class IKSAdminDriver extends AbstractDriver implements CheckableInterface
                 $ends = $base + $time;
             }
 
-            if (!$ignoreErrors) {
+            if ($simulate && !$ignoreErrors) {
                 $this->confirm(__('givecore.update_admin', [
                     ':name' => $admin['name'] ?? $user->name,
                     ':group' => $groupName,
                 ]));
             }
 
-            $updateData = [];
-            if (!empty($groupName)) {
-                $updateData['group_name'] = $groupName;
-            }
-            if (!empty($flags)) {
-                $updateData['flags'] = $flags;
-            }
-            $updateData['immunity'] = $immunity;
-            $updateData['end'] = $ends;
+            if (!$simulate) {
+                $updateData = [];
+                if (!empty($groupName)) {
+                    $updateData['group_name'] = $groupName;
+                }
+                if (!empty($flags)) {
+                    $updateData['flags'] = $flags;
+                }
+                $updateData['immunity'] = $immunity;
+                $updateData['end'] = $ends;
 
-            $db
-                ->update($this->prefix . 'admins', $updateData)
-                ->where('steam_id', $steamId64)
-                ->where('server_id', $serverId)
-                ->run();
+                $db
+                    ->update($this->prefix . 'admins', $updateData)
+                    ->where('steam_id', $steamId64)
+                    ->where('server_id', $serverId)
+                    ->run();
+            }
         } else {
-            $db
-                ->insert($this->prefix . 'admins')
-                ->values([
-                    'steam_id' => $steamId64,
-                    'name' => $user->name,
-                    'flags' => $flags,
-                    'immunity' => $immunity,
-                    'group_name' => $groupName,
-                    'server_id' => $serverId,
-                    'end' => $ends,
-                    'created_at' => time(),
-                ])
-                ->run();
+            if (!$simulate) {
+                $db
+                    ->insert($this->prefix . 'admins')
+                    ->values([
+                        'steam_id' => $steamId64,
+                        'name' => $user->name,
+                        'flags' => $flags,
+                        'immunity' => $immunity,
+                        'group_name' => $groupName,
+                        'server_id' => $serverId,
+                        'end' => $ends,
+                        'created_at' => time(),
+                    ])
+                    ->run();
+            }
         }
 
-        return true;
+        return !$simulate;
     }
 }

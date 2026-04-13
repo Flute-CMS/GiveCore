@@ -7,6 +7,7 @@ use Flute\Core\Database\Entities\Server;
 use Flute\Core\Database\Entities\User;
 use Flute\Modules\GiveCore\Contracts\CheckableInterface;
 use Flute\Modules\GiveCore\Contracts\DriverInterface;
+use Flute\Modules\GiveCore\Exceptions\BadConfigurationException;
 use Flute\Modules\GiveCore\Give\Drivers\AdminSystemDriver;
 use Flute\Modules\GiveCore\Give\Drivers\AmxModDriver;
 use Flute\Modules\GiveCore\Give\Drivers\AmxUnbanDriver;
@@ -68,7 +69,7 @@ class GiveFactory
         bool $ignoreErrors = false,
     ): bool {
         if (!$this->exists($name)) {
-            throw new Exception("Driver '{$name}' is not exists");
+            throw new BadConfigurationException(__('givecore.errors.driver_not_found', ['driver' => $name]));
         }
 
         return $this->getDriver($name)->deliver($user, $server, $additional, $timeId, $ignoreErrors);

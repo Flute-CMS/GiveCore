@@ -132,6 +132,12 @@ class PexDriver extends AbstractDriver implements CheckableInterface
         ?int $timeId = null,
         bool $ignoreErrors = false,
     ): bool {
+        $simulate = false;
+        if (array_key_exists('__simulate', $additional)) {
+            $simulate = (bool) $additional['__simulate'];
+            unset($additional['__simulate']);
+        }
+
         $uuid = $this->getUserMinecraftUuid($user);
         if (!$uuid) {
             throw new UserSocialException('Minecraft');
@@ -145,7 +151,7 @@ class PexDriver extends AbstractDriver implements CheckableInterface
         $prefix = $this->getPrefix($dbConnection->dbname, '');
         $group = $additional['group'] ?? null;
         if (empty($group)) {
-            throw new BadConfigurationException('group', $server->name);
+            throw BadConfigurationException::noGroup($server->name);
         }
 
         $group = strtolower(trim($group));
@@ -159,37 +165,39 @@ class PexDriver extends AbstractDriver implements CheckableInterface
             ->andWhere('type', 1)
             ->fetchAll();
 
-        if (empty($existing)) {
+        if (!$simulate) {
+            if (empty($existing)) {
+                $db
+                    ->insert($prefix . 'permissions_entity')
+                    ->values([
+                        'name' => $uuid,
+                        'type' => 1,
+                        'default' => 0,
+                    ])
+                    ->run();
+            }
+
+            // Remove old group inheritance if exists
             $db
-                ->insert($prefix . 'permissions_entity')
+                ->delete($prefix . 'permissions_inheritance')
+                ->where('child', $uuid)
+                ->andWhere('parent', $group)
+                ->andWhere('type', 1)
+                ->run();
+
+            // Add group inheritance
+            $db
+                ->insert($prefix . 'permissions_inheritance')
                 ->values([
-                    'name' => $uuid,
+                    'child' => $uuid,
+                    'parent' => $group,
                     'type' => 1,
-                    'default' => 0,
+                    'world' => null,
                 ])
                 ->run();
         }
 
-        // Remove old group inheritance if exists
-        $db
-            ->delete($prefix . 'permissions_inheritance')
-            ->where('child', $uuid)
-            ->andWhere('parent', $group)
-            ->andWhere('type', 1)
-            ->run();
-
-        // Add group inheritance
-        $db
-            ->insert($prefix . 'permissions_inheritance')
-            ->values([
-                'child' => $uuid,
-                'parent' => $group,
-                'type' => 1,
-                'world' => null,
-            ])
-            ->run();
-
-        return true;
+        return !$simulate;
     }
 
     protected function getUserMinecraftUuid(User $user): ?string

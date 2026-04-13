@@ -53,12 +53,19 @@ class RconDriver extends AbstractDriver
         if ($cmd === '') {
             return null;
         }
+
         if (preg_match('/\{steam32\}|\{steam64\}|\{accountId\}/i', $cmd)) {
+            $steamInput = $config['steam_input'] ?? 'auto';
+            if ($steamInput === 'manual') {
+                return null;
+            }
             return 'Steam';
         }
+
         if (preg_match('/\{nick\}|\{username\}|\{minecraft\}/i', $cmd)) {
             return 'Minecraft';
         }
+
         return null;
     }
 
@@ -71,6 +78,37 @@ class RconDriver extends AbstractDriver
                 'required' => true,
                 'placeholder' => __('givecore.fields.command_placeholder'),
                 'help' => __('givecore.fields.command_help'),
+            ],
+            'steam_input' => [
+                'type' => 'select',
+                'label' => __('givecore.fields.rcon_steam_input'),
+                'required' => false,
+                'default' => 'auto',
+                'options' => [
+                    'auto' => __('givecore.fields.rcon_steam_input_auto'),
+                    'manual' => __('givecore.fields.rcon_steam_input_manual'),
+                ],
+                'help' => __('givecore.fields.rcon_steam_input_help'),
+            ],
+        ];
+    }
+
+    public function purchaseFields(array $config = []): array
+    {
+        $steamInput = $config['steam_input'] ?? 'auto';
+        $cmd = (string) ($config['command'] ?? '');
+        $usesSteam = (bool) preg_match('/\{steam32\}|\{steam64\}|\{accountId\}/i', $cmd);
+
+        if ($steamInput !== 'manual' || !$usesSteam) {
+            return [];
+        }
+
+        return [
+            'rcon_steamid' => [
+                'type' => 'text',
+                'label' => __('givecore.fields.amx_steamid'),
+                'required' => true,
+                'placeholder' => __('givecore.fields.amx_steamid_placeholder'),
             ],
         ];
     }
@@ -110,7 +148,7 @@ class RconDriver extends AbstractDriver
             }
         }
 
-        $steam = $this->getSteamIdForCommand($user, $additional['command']);
+        $steam = $this->getSteamIdForCommand($user, $additional['command'], $additional);
 
         if ($timeId !== null) {
             $this->time = $timeId;
@@ -126,7 +164,8 @@ class RconDriver extends AbstractDriver
 
             return true;
         } catch (Exception $e) {
-            throw new GiveDriverException($e->getMessage());
+            logs('modules')->error('RCON delivery failed', ['server' => $server->name, 'error' => $e->getMessage()]);
+            throw new GiveDriverException(__('givecore.errors.rcon_failed'));
         }
     }
 
@@ -135,27 +174,44 @@ class RconDriver extends AbstractDriver
     private function validateServerAndCommand(Server $server, array $additional): void
     {
         if (!$server->rcon) {
-            throw new BadConfigurationException("Server {$server->name} rcon empty");
+            throw BadConfigurationException::noRcon($server->name);
         }
 
         if (!isset($additional['command'])) {
-            throw new BadConfigurationException('command');
+            throw BadConfigurationException::noCommand();
         }
     }
 
-    private function getSteamIdForCommand(User $user, string $command): ?string
+    private function getSteamIdForCommand(User $user, string $command, array $additional = []): ?string
     {
-        if (preg_match('/{steam32}|{steam64}|{accountId}/i', $command)) {
-            $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
-
-            if (!$steam) {
-                throw new UserSocialException('Steam');
-            }
-
-            return $steam->value;
+        if (!preg_match('/{steam32}|{steam64}|{accountId}/i', $command)) {
+            return null;
         }
 
-        return null;
+        $steamInput = $additional['steam_input'] ?? 'auto';
+
+        if ($steamInput === 'manual') {
+            $rawSteamId = trim($additional['rcon_steamid'] ?? '');
+
+            if ($rawSteamId === '') {
+                throw new \RuntimeException(__('givecore.fields.amx_steamid_required'));
+            }
+
+            try {
+                $steamClass = steam()->steamid($rawSteamId);
+                return $steamClass->ConvertToUInt64();
+            } catch (\Throwable) {
+                throw new \RuntimeException(__('givecore.fields.amx_steamid_invalid'));
+            }
+        }
+
+        $steam = $user->getSocialNetwork('Steam') ?? $user->getSocialNetwork('HttpsSteam');
+
+        if (!$steam) {
+            throw new UserSocialException('Steam');
+        }
+
+        return $steam->value;
     }
 
     private function executeCommands(
